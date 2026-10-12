@@ -1,47 +1,60 @@
 @import "tailwindcss";
 
 :root {
-  --background: #090d16;
-  --foreground: #e2e8f0;
+  --background: #000000;
+  --foreground: #22c55e;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  background-color: #050807;
+  color: #22c55e;
+  font-family: "Courier New", Courier, monospace, ui-monospace, Menlo, Monaco, Consolas;
   overflow-x: hidden;
 }
 
-/* Custom cyber / terminal scrollbar */
+/* Custom terminal scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #020604;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 3px;
+  background: #14532d;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #0284c7;
+  background: #22c55e;
 }
 
-.terminal-glow {
-  box-shadow: 0 0 25px -5px rgba(2, 132, 199, 0.15);
+/* Authentic CRT scanlines effect */
+.crt-screen {
+  position: relative;
+  background: #040806;
 }
 
-.scanline {
-  background: linear-gradient(
-    to bottom,
-    rgba(255,255,255,0),
-    rgba(255,255,255,0) 50%,
-    rgba(0, 0, 0, 0.2) 50%,
-    rgba(0, 0, 0, 0.2)
-  );
-  background-size: 100% 4px;
+.crt-screen::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+  z-index: 20;
+  background-size: 100% 3px, 6px 100%;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+/* Blinking cursor */
+@keyframes terminal-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.terminal-cursor {
+  animation: terminal-blink 1s infinite;
 }

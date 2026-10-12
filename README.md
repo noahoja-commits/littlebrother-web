@@ -71,7 +71,12 @@ This repository uses `@opennextjs/cloudflare`, the modern official Next.js adapt
    - **Deploy command:** `npx wrangler deploy`
 4. Cloudflare automatically uses `wrangler.jsonc`, which bundles the Worker from `.open-next/worker.js` and assets from `.open-next/assets`.
 
-### Option B: Deploy via CLI
+### Option B: Deploy to Vercel (1-Click Instant Zero-Config)
+1. Go to [vercel.com](https://vercel.com) and click **Add New Project**.
+2. Import `noahoja-commits/littlebrother-web`.
+3. Click **Deploy**.
+
+### Option C: Deploy via Wrangler CLI
 ```bash
 # 1. Authenticate with your Cloudflare account
 npx wrangler login
