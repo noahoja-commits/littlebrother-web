@@ -1129,23 +1129,32 @@ export default function TerminalView() {
   return (
     <div
       onClick={() => inputRef.current?.focus()}
-      className="min-h-screen w-full bg-black text-[#22c55e] font-mono px-2 py-1 select-text cursor-text leading-[1.18] text-[13px] sm:text-[13.5px]"
+      style={{
+        minHeight: "100vh",
+        width: "100%",
+        backgroundColor: "#000000",
+        color: "#22c55e",
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+        padding: "6px 10px",
+        cursor: "text",
+        lineHeight: 1.2,
+        fontSize: "13.5px"
+      }}
     >
       {/* Terminal Stream */}
-      <div className="space-y-0 whitespace-pre font-mono">
+      <div style={{ whiteSpace: "pre", fontFamily: "inherit" }}>
         {lines.map((line, idx) => {
           if (!line) {
-            return <div key={idx} className="h-3" />;
+            return <div key={idx} style={{ height: "12px" }} />;
           }
 
           const spans = parseAnsi(line);
           return (
-            <div key={idx} className="leading-[1.18]">
+            <div key={idx} style={{ lineHeight: 1.2 }}>
               {spans.map((span, sIdx) => (
                 <span
                   key={sIdx}
-                  style={{ color: span.color }}
-                  className={span.bold ? "font-bold" : undefined}
+                  style={{ color: span.color || "#22c55e", fontWeight: span.bold ? "bold" : "normal" }}
                 >
                   {span.text}
                 </span>
@@ -1155,9 +1164,9 @@ export default function TerminalView() {
         })}
 
         {/* Active Command Line with Blinking Cursor */}
-        <div className="flex items-baseline pt-1">
-          <span className="text-[#22c55e]">{currentPrompt}</span>
-          <span className="text-[#22c55e] whitespace-pre">{inputValue}</span>
+        <div style={{ display: "flex", alignItems: "baseline", paddingTop: "4px" }}>
+          <span style={{ color: "#22c55e" }}>{currentPrompt}</span>
+          <span style={{ color: "#22c55e", whiteSpace: "pre" }}>{inputValue}</span>
           <span className="terminal-cursor"></span>
           <input
             ref={inputRef}
@@ -1165,7 +1174,7 @@ export default function TerminalView() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="opacity-0 w-0 h-0 absolute pointer-events-none"
+            style={{ opacity: 0, width: 0, height: 0, position: "absolute", pointerEvents: "none" }}
             autoFocus
             autoCapitalize="none"
             autoComplete="off"

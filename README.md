@@ -63,18 +63,19 @@ Based on the original Python OSINT framework by [AbirHasan2005/LittleBrother](ht
 
 This repository uses `@opennextjs/cloudflare`, the modern official Next.js adapter for Cloudflare Workers & Pages.
 
-### Option A: Cloudflare Dashboard (Workers / Pages Git Integration)
+### Option A: Deploy to Vercel (Recommended & Zero Configuration)
+1. Go to [vercel.com](https://vercel.com) and click **Add New Project**.
+2. Import `noahoja-commits/littlebrother-web`.
+3. Framework Preset: **Next.js**.
+4. Click **Deploy**. Vercel will run `npm run build` (`next build`) and deploy automatically.
+
+### Option B: Deploy to Cloudflare Workers / Pages
 1. In the **Cloudflare Dashboard**, navigate to **Workers & Pages** &rarr; **Create application** &rarr; select **Workers** or **Pages** &rarr; **Connect to Git**.
 2. Select repository: `noahoja-commits/littlebrother-web`.
 3. In Build settings:
-   - **Build command:** `npm run build`
+   - **Build command:** `npm run build:cloudflare`
    - **Deploy command:** `npx wrangler deploy`
 4. Cloudflare automatically uses `wrangler.jsonc`, which bundles the Worker from `.open-next/worker.js` and assets from `.open-next/assets`.
-
-### Option B: Deploy to Vercel (1-Click Instant Zero-Config)
-1. Go to [vercel.com](https://vercel.com) and click **Add New Project**.
-2. Import `noahoja-commits/littlebrother-web`.
-3. Click **Deploy**.
 
 ### Option C: Deploy via Wrangler CLI
 ```bash
