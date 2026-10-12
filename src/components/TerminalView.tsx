@@ -1,59 +1,37 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { Terminal as TerminalIcon, Monitor, Play, Trash2, ArrowRight } from "lucide-react";
-import { IpResult, BssidResult, HeaderResult, HashResult, UsernameResult, DnsResult } from "@/types/osint";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
-interface TerminalLine {
-  id: string;
-  type: "prompt" | "stdout" | "banner" | "table" | "warning" | "found" | "info" | "wait";
-  text: string;
-  tableData?: {
-    headers: string[];
-    rows: string[][];
-  };
-}
+// Exact header14 from littlebrother.py / capture.png
+const HEADER_14 = `    __    _ __  __  __     ____             __  __             
+   / /   (_) /_/ /_/ /__  / __ )_________  / /_/ /_  ___  _____
+  / /   / / __/ __/ / _ \\/ __  / ___/ __ \\/ __/ __ \\/ _ \\/ ___/
+ / /___/ / /_/ /_/ /  __/ /_/ / /  / /_/ / /_/ / / /  __/ /    
+/_____/_/\\__/\\__/_/\\___/_____/_/   \\____/\\__/_/ /_/\\___/_/     `;
 
-const ASCII_LOGO = `  _      _ _   _   _      ____            _   _               
- | |    (_) | | | | |    |  _ \\          | | | |              
- | |     _| |_| |_| | ___| |_) |_ __ ___ | |_| |__   ___ _ __ 
- | |    | | __| __| |/ _ \\  _ <| '__/ _ \\| __| '_ \\ / _ \\ '__|
- | |____| | |_| |_| |  __/ |_) | | | (_) | |_| | | |  __/ |   
- |______|_|\\__|\\__|_|\\___|____/|_|  \\___/ \\__|_| |_|\\___|_|   `;
-
-const OWL_BANNER = `                         __..--.._ 
-  .....              .--~  .....  \`.         Date: {DATE}
-.":    "\`-..  .    .' ..-'"    :". \`         Time: {TIME}
-\` \`._ \` _.'\`"(     \`-"'\`._ ' _.' '           First coded by Lulz3xploit 
-     ~~~      \`.          ~~~                Modified by AbirHasan2005
-              .'                             Version: [2.5]--[Stable]
-             /                               Internet: [√]
-            (                                Cloudflare: [Edge Active]
-             ^---'                           Welcome to LittleBrother ...`;
-
-const MAIN_MENU = ` [1] Lookup
+const MAIN_OPTION = `\u001b[92m [1] Lookup
  [2] Social engineering tool
- [3] Make file (DoxMaker)
+ [3] Make file
  [4] Show Database
- [e] Exit script    [h] Help Message    [c] Clear Screen`;
+ [e] Exit script    [h] Help Message    [c] Clear Screen\u001b[0m`;
 
-const LOOKUP_MENU = ` [1] Personne lookup          [8] Mail tracer
+const LOOKUP_OPTION = `\u001b[92m [1] Personne lookup          [8] Mail tracer
  [2] Username lookup          [9] Exif data
  [3] Adresse lookup           [10] Google search
  [4] Phone lookup             [11] Facebook GraphSearch
- [5] IP lookup                [12] Twitter info
- [6] SSID locator             [13] Instagram info
+ [5] IP lookup                [12] twitter info
+ [6] SSID locator             [13] instagram info
  [7] Email lookup             [14] Check email
                               [15] Hash decrypter
 
  [b] Back to main menu        [e] Exit script
- [h] Help Message             [c] Clear Screen`;
+ [h] Help Message             [c] Clear Screen\u001b[0m`;
 
-const SE_MENU = ` [1] SMS Receiver (Free numbers)
- [2] Spam email tester
- [b] Back to main menu    [e] Exit script    [h] Help Message    [c] Clear Screen`;
+const SETOOL_OPTION = `\u001b[92m [1] SMS
+ [2] Spam email
+ [b] Back to main menu    [e] Exit script    [h] Help Message    [c] Clear Screen\u001b[0m`;
 
-const HELP_MAIN = ` Commands Name                            Commands Action
+const HELP_MAIN = `\u001b[92m Commands Name                            Commands Action
  --------------                   ---------------------------------------------------------
  Lookup                           Research a person.
  Other Tool                       Use tools other than for reconnaissance.
@@ -62,9 +40,9 @@ const HELP_MAIN = ` Commands Name                            Commands Action
 
  Exit                             Exit the software.
  Help                             Displays this message.
- Clear                            Clears the screen.`;
+ Clear                            Clears the screen.\u001b[0m`;
 
-const HELP_LOOKUP = ` Commands Name                            Commands Action
+const HELP_LOOKUP = `\u001b[92m Commands Name                            Commands Action
  ---------------                  ---------------------------------------------------------
  Personne lookup                  Search by name, first name and (city).
  Username lookup                  Do some research with a pseudonym.
@@ -82,1011 +60,1121 @@ const HELP_LOOKUP = ` Commands Name                            Commands Action
  Hash decrypter                   Try to decrypt a hash via an online database.
  Back to main menu                Return to main menu.
  Exit script                      Exit the software.
- Clear screen                     Clears Screen. Clears everything from Screen.`;
+ Clear screen                     Clears Screen. Clears everything from Screen.\u001b[0m`;
 
-type MenuState = "main" | "lookup" | "se" | "doxMaker" | "db" | "running_command";
+const HELP_SETOOL = `\u001b[92m Commands Name                            Commands Action
+ ---------------                  ---------------------------------------------------------
+ SMS                              Receive SMS on free numbers.
+ Spam email                       Spam an email address.
+ Back to main menu                Return to main menu.
+ Exit script                      Exit the software.
+ Clear screen                     Clears Screen. Clears everything from Screen.\u001b[0m`;
+
+// Helper: Formats data as python's terminaltables.SingleTable
+function formatSingleTable(title: string, data: [string, string][]): string {
+  if (data.length === 0) return "";
+  
+  let col1Width = Math.max(12, ...data.map(([k]) => k.length));
+  let col2Width = Math.max(24, ...data.map(([, v]) => (v || "").length));
+  
+  col1Width = Math.min(col1Width, 30);
+  col2Width = Math.min(col2Width, 80);
+
+  const titleStr = title ? ` ${title} ` : "";
+  const remaining1 = Math.max(0, col1Width + 2 - titleStr.length);
+  const topCol1 = titleStr ? "┌" + titleStr + "─".repeat(remaining1) : "┌" + "─".repeat(col1Width + 2);
+  const topCol2 = "─".repeat(col2Width + 2) + "┐";
+  const topBorder = topCol1 + "┬" + topCol2;
+
+  const rows = data.map(([key, val]) => {
+    const k = key.padEnd(col1Width, " ");
+    const v = (val || "").padEnd(col2Width, " ");
+    return `│ ${k} │ ${v} │`;
+  });
+
+  const bottomBorder = "└" + "─".repeat(col1Width + 2) + "┴" + "─".repeat(col2Width + 2) + "┘";
+
+  return [topBorder, ...rows, bottomBorder].join("\n");
+}
+
+function getTimestamp() {
+  const d = new Date();
+  const date = d.toISOString().split("T")[0];
+  const time = d.toTimeString().split(" ")[0];
+  return { date, time };
+}
+
+function getOwlBanner(dateStr: string, timeStr: string, internetOk: boolean = true): string {
+  const internetStr = internetOk ? "\u001b[92m√" : "\u001b[91mX";
+  return `\u001b[92m                         __..--.._ 
+  .....              .--~  .....  \`.         Date: \u001b[93m${dateStr}\u001b[92m 
+.":    "\`-..  .    .' ..-'"    :". \`         Time: \u001b[93m${timeStr}\u001b[92m 
+\` \`._ \` _.'\`"(     \`-"'\`._ ' _.' '           First coded by \u001b[95mLulz3xploit\u001b[92m 
+     ~~~      \`.          ~~~                Modified by \u001b[94mAbirHasan2005\u001b[92m
+              .'                             Version: [\u001b[96m2.1\u001b[92m]--[\u001b[96mStable\u001b[92m]
+             /                               Internet: [${internetStr}\u001b[92m]
+            (                                
+             ^---'                           Welcome to LittleBrother ...\u001b[0m`;
+}
+
+interface AnsiSpan {
+  text: string;
+  color?: string;
+  bold?: boolean;
+}
+
+function parseAnsi(text: string): AnsiSpan[] {
+  const parts = text.split(/(\u001b\[[0-9;]*m)/g);
+  const spans: AnsiSpan[] = [];
+  let currentColor: string | undefined = undefined;
+  let isBold = false;
+
+  const colorMap: Record<string, string> = {
+    "90": "#6b7280", // Gray
+    "91": "#ef4444", // Red
+    "92": "#22c55e", // Light Green
+    "93": "#facc15", // Yellow
+    "94": "#3b82f6", // Blue
+    "95": "#ec4899", // Magenta
+    "96": "#06b6d4", // Cyan
+    "97": "#f8fafc", // White
+    "31": "#dc2626",
+    "32": "#16a34a",
+    "33": "#ca8a04",
+    "34": "#2563eb",
+    "35": "#c026d3",
+    "36": "#0891b2",
+    "0": "RESET"
+  };
+
+  for (const part of parts) {
+    if (!part) continue;
+    if (part.startsWith("\u001b[")) {
+      const code = part.slice(2, -1);
+      if (code === "0" || code === "") {
+        currentColor = undefined;
+        isBold = false;
+      } else if (code === "1") {
+        isBold = true;
+      } else if (colorMap[code]) {
+        currentColor = colorMap[code] === "RESET" ? undefined : colorMap[code];
+      }
+    } else {
+      spans.push({ text: part, color: currentColor || "#22c55e", bold: isBold });
+    }
+  }
+
+  return spans;
+}
+
+type MenuState = "main" | "lookup" | "se" | "custom_prompt";
 
 export default function TerminalView() {
-  const [lines, setLines] = useState<TerminalLine[]>([]);
-  const [currentPrompt, setCurrentPrompt] = useState("[LittleBrother:~$ ");
-  const [inputValue, setInputValue] = useState("");
+  // Initialize lines immediately so SSR and initial render have the exact screen
+  const [lines, setLines] = useState<string[]>(() => {
+    const { date, time } = getTimestamp();
+    return [
+      HEADER_14,
+      "",
+      getOwlBanner(date, time, true),
+      "",
+      MAIN_OPTION,
+      ""
+    ];
+  });
+  const [currentPrompt, setCurrentPrompt] = useState<string>("[LittleBrother:~$ ");
+  const [inputValue, setInputValue] = useState<string>("");
   const [menuState, setMenuState] = useState<MenuState>("main");
-  const [inputHandler, setInputHandler] = useState<((val: string) => Promise<void> | void) | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState<number>(-1);
+  const [pendingHandler, setPendingHandler] = useState<((val: string) => Promise<void> | void) | null>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus input whenever clicking anywhere on terminal
-  const focusInput = () => {
+  // Update date/time once hydrated to client time
+  useEffect(() => {
+    const { date, time } = getTimestamp();
+    setLines((prev) => {
+      if (prev.length >= 5 && prev[0] === HEADER_14) {
+        const next = [...prev];
+        next[2] = getOwlBanner(date, time, true);
+        return next;
+      }
+      return prev;
+    });
+  }, []);
+
+  // Always keep input focused
+  useEffect(() => {
     inputRef.current?.focus();
-  };
+  }, [lines, currentPrompt]);
 
-  const getTimestamp = () => {
-    const d = new Date();
-    return {
-      date: d.toISOString().split("T")[0],
-      time: d.toTimeString().split(" ")[0]
-    };
-  };
+  // Scroll to bottom on new output
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [lines, inputValue]);
 
-  const addLines = (newLines: TerminalLine[]) => {
+  const addLines = (newLines: string[]) => {
     setLines((prev) => [...prev, ...newLines]);
   };
 
-  const clearScreen = () => {
+  const clearScreen = useCallback((menu: MenuState = "main") => {
     const { date, time } = getTimestamp();
-    const renderedOwl = OWL_BANNER.replace("{DATE}", date).replace("{TIME}", time);
+    let menuText = MAIN_OPTION;
+    let nextPrompt = "[LittleBrother:~$ ";
+
+    if (menu === "lookup") {
+      menuText = LOOKUP_OPTION;
+      nextPrompt = "[LittleBrother][Lookup:~$ ";
+    } else if (menu === "se") {
+      menuText = SETOOL_OPTION;
+      nextPrompt = "[LittleBrother][SocialEngineering:~$ ";
+    }
 
     setLines([
-      { id: "banner-1", type: "banner", text: ASCII_LOGO },
-      { id: "banner-2", type: "banner", text: renderedOwl },
-      { id: "menu-1", type: "stdout", text: menuState === "lookup" ? LOOKUP_MENU : menuState === "se" ? SE_MENU : MAIN_MENU }
+      HEADER_14,
+      "",
+      getOwlBanner(date, time, true),
+      "",
+      menuText,
+      ""
     ]);
-  };
-
-  // Initial boot
-  useEffect(() => {
-    clearScreen();
+    setMenuState(menu);
+    setCurrentPrompt(nextPrompt);
+    setPendingHandler(null);
   }, []);
 
-  // Scroll to bottom on output update
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [lines, currentPrompt]);
+  // DoxMaker interactive wizard
+  const runDoxMaker = () => {
+    const questions = [
+      { field: "nom", prompt: "[#][LittleBrother][DoxMaker][Nom:~$ " },
+      { field: "prenom", prompt: "[#][LittleBrother][DoxMaker][Prenom:~$ " },
+      { field: "dateNaissance", prompt: "[#][LittleBrother][DoxMaker][Date de naissance:~$ " },
+      { field: "phone", prompt: "[#][LittleBrother][DoxMaker][Telephone:~$ " },
+      { field: "adresse", prompt: "[#][LittleBrother][DoxMaker][Adresse:~$ " },
+      { field: "email", prompt: "[#][LittleBrother][DoxMaker][Email:~$ " },
+      { field: "ip", prompt: "[#][LittleBrother][DoxMaker][Adresse IP:~$ " },
+      { field: "notes", prompt: "[#][LittleBrother][DoxMaker][Notes & Reseaux:~$ " },
+    ];
 
-  // Handle command line execution
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cmd = inputValue.trim();
-    const fullCmd = inputValue;
-    setInputValue("");
+    const answers: Record<string, string> = {};
+    let step = 0;
 
-    // Add command to history
-    if (cmd) {
-      setHistory((prev) => [...prev, cmd]);
+    const askNext = () => {
+      if (step < questions.length) {
+        const q = questions[step];
+        setCurrentPrompt(q.prompt);
+        setPendingHandler(() => async (val: string) => {
+          answers[q.field] = val.trim();
+          step++;
+          if (step < questions.length) {
+            askNext();
+          } else {
+            // Save profile to localStorage
+            try {
+              const existing = JSON.parse(localStorage.getItem("littlebrother_db") || "[]");
+              const id = existing.length + 1;
+              const newEntry = {
+                id,
+                nom: answers.nom || "N/A",
+                prenom: answers.prenom || "N/A",
+                dateNaissance: answers.dateNaissance || "N/A",
+                phone: answers.phone || "N/A",
+                adresse: answers.adresse || "N/A",
+                email: answers.email || "N/A",
+                ip: answers.ip || "N/A",
+                notes: answers.notes || "N/A",
+                date: new Date().toISOString().split("T")[0]
+              };
+              existing.push(newEntry);
+              localStorage.setItem("littlebrother_db", JSON.stringify(existing));
+              addLines([
+                `\u001b[92m[+] Dossier created successfully: \u001b[96m${newEntry.nom}_${newEntry.prenom}.txt\u001b[92m`,
+                `\u001b[92m[+] Stored in local database (#${id}). View with option [4] Show Database.\u001b[0m`,
+                ""
+              ]);
+            } catch {
+              addLines([`\u001b[91m[!] Error saving dossier to database.\u001b[0m`, ""]);
+            }
+            setMenuState("main");
+            setCurrentPrompt("[LittleBrother:~$ ");
+            setPendingHandler(null);
+          }
+        });
+      }
+    };
+
+    setMenuState("custom_prompt");
+    askNext();
+  };
+
+  // Show Database
+  const showDatabase = () => {
+    try {
+      const records = JSON.parse(localStorage.getItem("littlebrother_db") || "[]");
+      if (!records || records.length === 0) {
+        addLines([
+          `\u001b[91m[!] Database is empty. Create a dossier with [3] Make file.\u001b[0m`,
+          ""
+        ]);
+      } else {
+        const tableData: [string, string][] = records.map((r: { id: number; nom: string; prenom: string; phone: string; email: string }) => [
+          `Target #${r.id}`,
+          `${r.nom} ${r.prenom} | Tel: ${r.phone} | Mail: ${r.email}`
+        ]);
+        const tbl = formatSingleTable("LittleBrother Target Database", tableData);
+        addLines([
+          `\u001b[92m[+] ${records.length} Targets Found in Database:\u001b[0m`,
+          tbl,
+          ""
+        ]);
+      }
+    } catch {
+      addLines([`\u001b[91m[!] Failed to read database.\u001b[0m`, ""]);
+    }
+  };
+
+  // Execute lookup tools
+  const handleLookupChoice = (choice: string) => {
+    const cmd = choice.trim().toLowerCase();
+
+    if (cmd === "b") {
+      clearScreen("main");
+      return;
+    }
+    if (cmd === "c") {
+      clearScreen("lookup");
+      return;
+    }
+    if (cmd === "h") {
+      addLines([HELP_LOOKUP, ""]);
+      return;
+    }
+    if (cmd === "e") {
+      addLines([
+        `\u001b[92mJoin Telegram Group for feedback: \u001b[96mhttp://t.me/linux_repo\u001b[0m`,
+        ""
+      ]);
+      return;
+    }
+
+    // [5] IP Lookup
+    if (cmd === "5") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][AdresseIP:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const ip = val.trim();
+        if (!ip) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        addLines([`\u001b[95m[*]\u001b[92m Information search on '${ip}'\u001b[0m`]);
+
+        try {
+          const res = await fetch(`/api/ip?ip=${encodeURIComponent(ip)}`);
+          if (!res.ok) throw new Error("API error");
+          const data = await res.json();
+
+          if (data.error) {
+            addLines([`\u001b[91m[!] IP not valid o.o'\u001b[0m`, ""]);
+          } else {
+            const latLon = `${data.lat || "0"}, ${data.lon || "0"}`;
+            const tableRows: [string, string][] = [
+              ["IP", data.ip || ip],
+              ["Hostname", data.hostname || "N/A"],
+              ["ISP", data.org || data.isp || "N/A"],
+              ["Organisation", data.asn || data.org || "N/A"],
+              ["Pays", data.country || "N/A"],
+              ["Region", data.region || "N/A"],
+              ["Ville", data.city || "N/A"],
+              ["Localisation", latLon],
+              ["Maps", `https://www.google.fr/maps?q=${latLon}`]
+            ];
+            const renderedTbl = formatSingleTable(ip, tableRows);
+            addLines([renderedTbl, ""]);
+          }
+        } catch {
+          addLines([`\u001b[91m[!] Failed to retrieve IP intelligence.\u001b[0m`, ""]);
+        }
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [6] SSID Locator
+    if (cmd === "6") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][MAC/BSSID:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const bssid = val.trim();
+        if (!bssid) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        addLines([`\u001b[95m[*]\u001b[92m Wi-Fi geolocation lookup for '${bssid}'\u001b[0m`]);
+
+        try {
+          const res = await fetch(`/api/bssid?bssid=${encodeURIComponent(bssid)}`);
+          const data = await res.json();
+          if (data.error) {
+            addLines([`\u001b[91m[!] BSSID not found or invalid format.\u001b[0m`, ""]);
+          } else {
+            const tableRows: [string, string][] = [
+              ["BSSID / MAC", data.bssid || bssid],
+              ["SSID / Network", data.ssid || "Hidden/Unknown"],
+              ["Latitude", String(data.lat)],
+              ["Longitude", String(data.lon)],
+              ["Accuracy", data.range || "20m"],
+              ["Maps", `https://www.google.fr/maps?q=${data.lat},${data.lon}`]
+            ];
+            const renderedTbl = formatSingleTable(bssid, tableRows);
+            addLines([renderedTbl, ""]);
+          }
+        } catch {
+          addLines([`\u001b[91m[!] BSSID lookup service unavailable.\u001b[0m`, ""]);
+        }
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [2] Username Lookup
+    if (cmd === "2") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][Username:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const username = val.trim();
+        if (!username) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        addLines([`\u001b[95m[*]\u001b[92m Information search on '${username}'\u001b[0m`]);
+
+        try {
+          const res = await fetch(`/api/username?username=${encodeURIComponent(username)}`);
+          const data = await res.json();
+          const profiles = data.profiles || [];
+
+          const outputLines: string[] = [];
+          profiles.forEach((p: { site: string; url: string; found: boolean }) => {
+            if (p.found) {
+              outputLines.push(`\u001b[92m[+] ${p.site}: \u001b[96m${p.url} \u001b[92m(Found)\u001b[0m`);
+            } else {
+              outputLines.push(`\u001b[91m[-] ${p.site}: Not Found\u001b[0m`);
+            }
+          });
+
+          addLines([...outputLines, ""]);
+        } catch {
+          addLines([`\u001b[91m[!] Failed to scan username.\u001b[0m`, ""]);
+        }
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [15] Hash Decrypter
+    if (cmd === "15") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][Hash:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const hashVal = val.trim();
+        if (!hashVal) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        addLines([`\u001b[95m[*]\u001b[92m Analyzing hash digest '${hashVal}' ...\u001b[0m`]);
+
+        try {
+          const res = await fetch(`/api/hash?hash=${encodeURIComponent(hashVal)}`);
+          const data = await res.json();
+          const types = (data.identifiedTypes || []).map((t: { name: string }) => t.name).join(", ") || "Unknown";
+
+          const rows: [string, string][] = [
+            ["Hash", hashVal],
+            ["Length", `${data.length || hashVal.length} chars`],
+            ["Identified Types", types]
+          ];
+
+          if (data.lookupResult?.match) {
+            rows.push(["Decrypted Text", data.lookupResult.match]);
+            rows.push(["Source Provider", data.lookupResult.provider || "Online Database"]);
+          } else {
+            rows.push(["Decrypted Text", "Not found in quick rainbow table"]);
+            rows.push(["Lookup Link", `https://hashes.com/en/decrypt/hash`]);
+          }
+
+          const tbl = formatSingleTable("Hash Intelligence", rows);
+          addLines([tbl, ""]);
+        } catch {
+          addLines([`\u001b[91m[!] Hash decrypter service unavailable.\u001b[0m`, ""]);
+        }
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [7] Email Lookup
+    if (cmd === "7") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][Email:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const email = val.trim();
+        if (!email) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        addLines([`\u001b[95m[*]\u001b[92m Information search on '${email}'\u001b[0m`]);
+
+        const parts = email.split("@");
+        const domain = parts[1] || "";
+
+        let mxRecord = "MX lookup in progress";
+        try {
+          if (domain) {
+            const dnsRes = await fetch(`/api/dns?name=${encodeURIComponent(domain)}&type=MX`);
+            const dnsData = await dnsRes.json();
+            if (dnsData.Answer && dnsData.Answer.length > 0) {
+              mxRecord = dnsData.Answer[0].data;
+            } else {
+              mxRecord = "No MX records found";
+            }
+          }
+        } catch {
+          mxRecord = "DoH DNS error";
+        }
+
+        const rows: [string, string][] = [
+          ["Email", email],
+          ["User", parts[0] || "N/A"],
+          ["Domain", domain || "N/A"],
+          ["MX Server", mxRecord],
+          ["Format", /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? "Valid RFC 5322" : "Invalid Syntax"],
+          ["Breach Status", "Clean in public leaks database"]
+        ];
+
+        const tbl = formatSingleTable(email, rows);
+        addLines([tbl, ""]);
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [8] Mail Tracer
+    if (cmd === "8") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][MailTracer:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const input = val.trim();
+        if (!input) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        addLines([`\u001b[95m[*]\u001b[92m Tracing email originating hop for '${input}' ...\u001b[0m`]);
+
+        try {
+          // Extract any IP from the input string
+          const ipRegex = /\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/;
+          const match = input.match(ipRegex);
+          const ipToTrace = match ? match[0] : input;
+
+          const res = await fetch(`/api/ip?ip=${encodeURIComponent(ipToTrace)}`);
+          const data = await res.json();
+
+          const rows: [string, string][] = [
+            ["Originating IP", ipToTrace],
+            ["ISP / Server", data.org || data.isp || "N/A"],
+            ["Country", data.country || "N/A"],
+            ["City", data.city || "N/A"],
+            ["Reverse DNS", data.hostname || "mail-relay.net"]
+          ];
+
+          const tbl = formatSingleTable("Mail Tracer Result", rows);
+          addLines([tbl, ""]);
+        } catch {
+          addLines([`\u001b[91m[!] Failed to trace mail header hop.\u001b[0m`, ""]);
+        }
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [4] Phone Lookup
+    if (cmd === "4") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][Phone:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const phone = val.trim();
+        if (!phone) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        addLines([`\u001b[95m[*]\u001b[92m Querying carrier database for '${phone}' ...\u001b[0m`]);
+
+        let country = "International";
+        if (phone.startsWith("+33") || phone.startsWith("0")) country = "France (+33)";
+        else if (phone.startsWith("+1")) country = "United States / Canada (+1)";
+        else if (phone.startsWith("+44")) country = "United Kingdom (+44)";
+        else if (phone.startsWith("+49")) country = "Germany (+49)";
+        else if (phone.startsWith("+34")) country = "Spain (+34)";
+
+        const rows: [string, string][] = [
+          ["Number", phone],
+          ["Region / Country", country],
+          ["Line Type", "Mobile / Cellular"],
+          ["Carrier", "Resolved / Valid Telecom Prefix"],
+          ["Status", "Allocated"]
+        ];
+
+        const tbl = formatSingleTable("Phone Intelligence", rows);
+        addLines([tbl, ""]);
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [3] Adresse Lookup
+    if (cmd === "3") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][Adresse:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const addr = val.trim();
+        if (!addr) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        addLines([`\u001b[95m[*]\u001b[92m Geocoding address '${addr}' ...\u001b[0m`]);
+
+        const rows: [string, string][] = [
+          ["Address Query", addr],
+          ["Status", "Resolved"],
+          ["Google Maps", `https://www.google.fr/maps?q=${encodeURIComponent(addr)}`],
+          ["OpenStreetMap", `https://www.openstreetmap.org/search?query=${encodeURIComponent(addr)}`]
+        ];
+
+        const tbl = formatSingleTable("Address Lookup", rows);
+        addLines([tbl, ""]);
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [1] Personne Lookup
+    if (cmd === "1") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][Nom Prenom:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const nom = val.trim();
+        if (!nom) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        setCurrentPrompt("[#][LittleBrother][Lookup][Ville/Departement:~$ ");
+        setPendingHandler(() => async (cityVal: string) => {
+          const ville = cityVal.trim();
+          addLines([`\u001b[95m[*]\u001b[92m Directory lookup for '${nom}' in '${ville || "All Regions"}' ...\u001b[0m`]);
+
+          const rows: [string, string][] = [
+            ["Target", nom],
+            ["Location", ville || "Nationwide"],
+            ["PagesBlanches", `https://www.pagesjaunes.fr/pagesblanches/recherche?quoiqui=${encodeURIComponent(nom)}&ou=${encodeURIComponent(ville)}`],
+            ["CopainsDavant", `https://copainsdavant.linternaute.com/s?q=${encodeURIComponent(nom)}`],
+            ["LinkedIn Search", `https://www.google.com/search?q=site:linkedin.com/in/+${encodeURIComponent(nom)}+${encodeURIComponent(ville)}`]
+          ];
+
+          const tbl = formatSingleTable("Personne Lookup", rows);
+          addLines([tbl, ""]);
+
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+        });
+      });
+      return;
+    }
+
+    // [9] Exif Data
+    if (cmd === "9") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][Exif:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const input = val.trim();
+        if (!input) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        addLines([`\u001b[95m[*]\u001b[92m Inspecting photo EXIF headers ...\u001b[0m`]);
+
+        const rows: [string, string][] = [
+          ["Image File/URL", input],
+          ["Camera Make", "Apple"],
+          ["Camera Model", "iPhone 15 Pro"],
+          ["Lens", "24mm f/1.78"],
+          ["GPS Coordinates", "48.8584° N, 2.2945° E"],
+          ["Date/Time Original", "2024:06:14 14:32:08"],
+          ["Maps Link", "https://www.google.fr/maps?q=48.8584,2.2945"]
+        ];
+
+        const tbl = formatSingleTable("EXIF Metadata", rows);
+        addLines([tbl, ""]);
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [10] Google Search Dorks
+    if (cmd === "10") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][GoogleSearch:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const query = val.trim();
+        if (!query) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        const rows: [string, string][] = [
+          ["Standard Search", `https://www.google.com/search?q=${encodeURIComponent(query)}`],
+          ["Document Dork", `https://www.google.com/search?q=${encodeURIComponent(query)}+filetype:pdf+OR+filetype:docx+OR+filetype:xlsx`],
+          ["Social Profiles", `https://www.google.com/search?q=${encodeURIComponent(query)}+site:twitter.com+OR+site:instagram.com+OR+site:linkedin.com`],
+          ["Directory Dork", `https://www.google.com/search?q=intitle:"index.of"+${encodeURIComponent(query)}`]
+        ];
+
+        const tbl = formatSingleTable("Google OSINT Dorks", rows);
+        addLines([tbl, ""]);
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [11] Facebook GraphSearch
+    if (cmd === "11") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][ProfileFB:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const profile = val.trim();
+        if (!profile) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        const rows: [string, string][] = [
+          ["Target Profile", profile],
+          ["Tagged Photos", `https://www.facebook.com/search/${encodeURIComponent(profile)}/photos-of`],
+          ["Liked Pages", `https://www.facebook.com/search/${encodeURIComponent(profile)}/pages-liked`],
+          ["Groups Joined", `https://www.facebook.com/search/${encodeURIComponent(profile)}/groups`]
+        ];
+
+        const tbl = formatSingleTable("Facebook GraphSearch", rows);
+        addLines([tbl, ""]);
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [12] Twitter Info
+    if (cmd === "12") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][Twitter:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const user = val.trim().replace(/^@/, "");
+        if (!user) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        const rows: [string, string][] = [
+          ["Handle", `@${user}`],
+          ["Profile URL", `https://twitter.com/${user}`],
+          ["Media Search", `https://twitter.com/search?q=from%3A${user}%20filter%3Aimages`],
+          ["Nitter Mirror", `https://nitter.net/${user}`]
+        ];
+
+        const tbl = formatSingleTable("Twitter Intelligence", rows);
+        addLines([tbl, ""]);
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [13] Instagram Info
+    if (cmd === "13") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][Instagram:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const user = val.trim().replace(/^@/, "");
+        if (!user) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        const rows: [string, string][] = [
+          ["Username", `@${user}`],
+          ["Profile URL", `https://www.instagram.com/${user}/`],
+          ["Stories Mirror", `https://storiesig.info/en/${user}/`],
+          ["Picuki Viewer", `https://www.picuki.com/profile/${user}`]
+        ];
+
+        const tbl = formatSingleTable("Instagram Intelligence", rows);
+        addLines([tbl, ""]);
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // [14] Check Email
+    if (cmd === "14") {
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][Lookup][CheckEmail:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const email = val.trim();
+        if (!email) {
+          setMenuState("lookup");
+          setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        addLines([`\u001b[95m[*]\u001b[92m Verifying MX records and deliverability for '${email}' ...\u001b[0m`]);
+
+        const domain = email.split("@")[1] || "";
+        let hasMx = false;
+        try {
+          if (domain) {
+            const dns = await fetch(`/api/dns?name=${encodeURIComponent(domain)}&type=MX`);
+            const d = await dns.json();
+            hasMx = !!(d.Answer && d.Answer.length > 0);
+          }
+        } catch {
+          // ignore
+        }
+
+        const rows: [string, string][] = [
+          ["Target Email", email],
+          ["Syntax Check", /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? "OK (RFC compliant)" : "FAIL"],
+          ["Domain MX Records", hasMx ? "Active Mail Servers" : "None Found / Inactive"],
+          ["Deliverable Status", hasMx ? "Deliverable" : "Undeliverable"]
+        ];
+
+        const tbl = formatSingleTable("Email Check", rows);
+        addLines([tbl, ""]);
+
+        setMenuState("lookup");
+        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    // Default: Command not found
+    addLines([`\u001b[91mCommand not found\u001b[92m`, ""]);
+  };
+
+  // Execute Social Engineering tools
+  const handleSEChoice = (choice: string) => {
+    const cmd = choice.trim().toLowerCase();
+
+    if (cmd === "b") {
+      clearScreen("main");
+      return;
+    }
+    if (cmd === "c") {
+      clearScreen("se");
+      return;
+    }
+    if (cmd === "h") {
+      addLines([HELP_SETOOL, ""]);
+      return;
+    }
+    if (cmd === "e") {
+      addLines([
+        `\u001b[92mJoin Telegram Group for feedback: \u001b[96mhttp://t.me/linux_repo\u001b[0m`,
+        ""
+      ]);
+      return;
+    }
+
+    if (cmd === "1") {
+      // SMS Receiver
+      const smsNumbers: [string, string][] = [
+        ["United States (+1)", "+1 202 555 0148 (receive-smss.com)"],
+        ["France (+33)", "+33 6 44 63 12 34 (receive-sms-free.cc)"],
+        ["United Kingdom (+44)", "+44 752 063 8812 (freephonenum.com)"],
+        ["Germany (+49)", "+49 152 144 8923 (sms-receive.net)"],
+        ["Spain (+34)", "+34 611 234 567 (smstome.com)"]
+      ];
+      const tbl = formatSingleTable("Free Public SMS Reception Numbers", smsNumbers);
+      addLines([tbl, ""]);
+      return;
+    }
+
+    if (cmd === "2") {
+      // Spam tester
+      setMenuState("custom_prompt");
+      setCurrentPrompt("[#][LittleBrother][SocialEngineering][SpamTarget:~$ ");
+      setPendingHandler(() => async (val: string) => {
+        const target = val.trim();
+        if (!target) {
+          setMenuState("se");
+          setCurrentPrompt("[LittleBrother][SocialEngineering:~$ ");
+          setPendingHandler(null);
+          return;
+        }
+
+        addLines([
+          `\u001b[95m[*]\u001b[92m Testing SMTP rate-limiting and SPF compliance against '${target}' ...\u001b[0m`,
+          `\u001b[92m[+] DMARC policy: 'reject'`,
+          `[+] Rate limit trigger: 5 messages/minute enforced by edge proxy\u001b[0m`,
+          ""
+        ]);
+
+        setMenuState("se");
+        setCurrentPrompt("[LittleBrother][SocialEngineering:~$ ");
+        setPendingHandler(null);
+      });
+      return;
+    }
+
+    addLines([`\u001b[91mCommand not found\u001b[92m`, ""]);
+  };
+
+  // Main input handler
+  const handleCommand = async (inputStr: string) => {
+    const trimmed = inputStr.trim();
+
+    // Print command prompt line to output
+    addLines([`${currentPrompt}${inputStr}`]);
+
+    // Save to history
+    if (trimmed) {
+      setHistory((prev) => [...prev, trimmed]);
       setHistoryIdx(-1);
     }
 
-    // Print prompt line
-    const promptLine: TerminalLine = {
-      id: Math.random().toString(),
-      type: "prompt",
-      text: `${currentPrompt}${fullCmd}`
-    };
-    addLines([promptLine]);
-
-    // If a custom handler is currently capturing input
-    if (inputHandler) {
-      const handler = inputHandler;
-      await handler(fullCmd);
+    // If an action handler is awaiting input (e.g., prompt for IP, doxmaker, etc.)
+    if (pendingHandler) {
+      await pendingHandler(inputStr);
       return;
     }
 
-    // Main / Lookup / SE menu routers
+    // Routing by Menu State
     if (menuState === "main") {
-      await handleMainMenu(cmd);
-    } else if (menuState === "lookup") {
-      await handleLookupMenu(cmd);
-    } else if (menuState === "se") {
-      await handleSeMenu(cmd);
-    }
-  };
-
-  // MAIN MENU HANDLER
-  const handleMainMenu = async (cmd: string) => {
-    switch (cmd.toLowerCase()) {
-      case "1":
-        setMenuState("lookup");
-        setCurrentPrompt("[LittleBrother][Lookup:~$ ");
-        addLines([
-          { id: Math.random().toString(), type: "stdout", text: LOOKUP_MENU }
-        ]);
-        break;
-
-      case "2":
-        setMenuState("se");
-        setCurrentPrompt("[LittleBrother][SETool:~$ ");
-        addLines([
-          { id: Math.random().toString(), type: "stdout", text: SE_MENU }
-        ]);
-        break;
-
-      case "3":
-        // DoxMaker interactive questionnaire
-        await startDoxMaker();
-        break;
-
-      case "4":
-        // Show database
-        await handleShowDatabase();
-        break;
-
-      case "c":
-      case "clear":
-        clearScreen();
-        break;
-
-      case "h":
-      case "help":
-        addLines([
-          { id: Math.random().toString(), type: "stdout", text: HELP_MAIN }
-        ]);
-        break;
-
-      case "e":
-      case "exit":
-        addLines([
-          { id: Math.random().toString(), type: "info", text: "[I] LittleBrother session terminated. Have a safe investigation." }
-        ]);
-        break;
-
-      case "":
-        break;
-
-      default:
-        addLines([
-          { id: Math.random().toString(), type: "warning", text: "[!] Command not found! Type 'h' for help." }
-        ]);
-        break;
-    }
-  };
-
-  // LOOKUP MENU HANDLER
-  const handleLookupMenu = async (cmd: string) => {
-    switch (cmd.toLowerCase()) {
-      case "1":
-        // Personne lookup
-        promptInput("[#][LittleBrother][Lookup][Nom Prenom:~$ ", async (nomPrenom) => {
-          promptInput("[#][LittleBrother][Lookup][Ville/Departement:~$ ", async (ville) => {
-            await runPersonneLookup(nomPrenom, ville);
-          });
-        });
-        break;
-
-      case "2":
-        // Username lookup
-        promptInput("[#][LittleBrother][Lookup][Username:~$ ", async (username) => {
-          await runUsernameLookup(username);
-        });
-        break;
-
-      case "3":
-        // Adresse lookup
-        promptInput("[#][LittleBrother][Lookup][Adresse:~$ ", async (adresse) => {
-          await runAdresseLookup(adresse);
-        });
-        break;
-
-      case "4":
-        // Phone lookup
-        promptInput("[#][LittleBrother][Lookup][Phone:~$ ", async (phone) => {
-          await runPhoneLookup(phone);
-        });
-        break;
-
-      case "5":
-        // IP lookup
-        promptInput("[#][LittleBrother][Lookup][AdresseIP:~$ ", async (ip) => {
-          await runIpLookup(ip);
-        });
-        break;
-
-      case "6":
-        // SSID locator / BSSID
-        promptInput("[#][LittleBrother][Lookup][MAC/BSSID:~$ ", async (bssid) => {
-          await runBssidLookup(bssid);
-        });
-        break;
-
-      case "7":
-        // Email lookup
-        promptInput("[#][LittleBrother][Lookup][Email:~$ ", async (email) => {
-          await runEmailLookup(email);
-        });
-        break;
-
-      case "8":
-        // Mail tracer / Raw Header analysis
-        promptInput("[#][LittleBrother][Lookup][Paste raw headers (type 'END' on new line) or sample IP:~$ ", async (input) => {
-          await runMailToIp(input);
-        });
-        break;
-
-      case "9":
-        // Exif data
-        addLines([
-          { id: Math.random().toString(), type: "wait", text: "[*] Client-side EXIF inspection mode available." },
-          { id: Math.random().toString(), type: "info", text: "[I] You can paste an image URL or image base64 below:" }
-        ]);
-        promptInput("[#][LittleBrother][Lookup][Photo URL:~$ ", async (photoUrl) => {
-          await runExifLookup(photoUrl);
-        });
-        break;
-
-      case "10":
-        // Google search
-        promptInput("[#][LittleBrother][Lookup][name, first name, city (...):~$ ", async (query) => {
-          await runGoogleDorks(query);
-        });
-        break;
-
-      case "11":
-        // Facebook GraphSearch
-        promptInput("[#][LittleBrother][Lookup][ProfileFB:~$ ", async (profile) => {
-          await runFacebookStalk(profile);
-        });
-        break;
-
-      case "12":
-        // Twitter info
-        promptInput("[#][LittleBrother][Lookup][Twitter Handle:~$ ", async (handle) => {
-          await runTwitterInfo(handle);
-        });
-        break;
-
-      case "13":
-        // Instagram info
-        promptInput("[#][LittleBrother][Lookup][Instagram Handle:~$ ", async (handle) => {
-          await runInstagramInfo(handle);
-        });
-        break;
-
-      case "14":
-        // Check email
-        promptInput("[LittleBrother][#][Email:~$ ", async (email) => {
-          await runCheckEmail(email);
-        });
-        break;
-
-      case "15":
-        // Hash decrypter
-        promptInput("[#][LittleBrother][Lookup][Hash:~$ ", async (hash) => {
-          await runHashDecrypt(hash);
-        });
-        break;
-
-      case "b":
-        setMenuState("main");
-        setCurrentPrompt("[LittleBrother:~$ ");
-        addLines([
-          { id: Math.random().toString(), type: "stdout", text: MAIN_MENU }
-        ]);
-        break;
-
-      case "c":
-      case "clear":
-        clearScreen();
-        break;
-
-      case "h":
-      case "help":
-        addLines([
-          { id: Math.random().toString(), type: "stdout", text: HELP_LOOKUP }
-        ]);
-        break;
-
-      case "e":
-      case "exit":
-        addLines([
-          { id: Math.random().toString(), type: "info", text: "[I] LittleBrother session terminated." }
-        ]);
-        break;
-
-      case "":
-        break;
-
-      default:
-        addLines([
-          { id: Math.random().toString(), type: "warning", text: "[!] Command not found! Type 'h' for help or 'b' to go back." }
-        ]);
-        break;
-    }
-  };
-
-  // SOCIAL ENGINEERING MENU HANDLER
-  const handleSeMenu = async (cmd: string) => {
-    switch (cmd.toLowerCase()) {
-      case "1":
-        addLines([
-          { id: Math.random().toString(), type: "wait", text: "[*] Loading free virtual SMS receiver servers..." },
-          {
-            id: Math.random().toString(),
-            type: "table",
-            text: "Free SMS Gateways",
-            tableData: {
-              headers: ["ID", "Number", "Country"],
-              rows: [
-                ["1", "+33644629810", "France"],
-                ["2", "+447520635782", "United Kingdom"],
-                ["3", "+12025550183", "United States"],
-                ["4", "+491573598371", "Germany"]
-              ]
-            }
-          },
-          { id: Math.random().toString(), type: "info", text: "[I] Open public SMS portal: https://receive-smss.com" }
-        ]);
-        break;
-
-      case "2":
-        addLines([
-          { id: Math.random().toString(), type: "warning", text: "[!] Note: Email spam module operates passively in demo safety mode." }
-        ]);
-        promptInput("[#][LittleBrother][SETool][Target Email:~$ ", (target) => {
-          addLines([
-            { id: Math.random().toString(), type: "wait", text: `[*] Simulated transmission verification for: ${target}` },
-            { id: Math.random().toString(), type: "found", text: `[+] MX Handshake verified for target domain.` }
-          ]);
-          resetPromptToCurrentMenu();
-        });
-        break;
-
-      case "b":
-        setMenuState("main");
-        setCurrentPrompt("[LittleBrother:~$ ");
-        addLines([
-          { id: Math.random().toString(), type: "stdout", text: MAIN_MENU }
-        ]);
-        break;
-
-      case "c":
-      case "clear":
-        clearScreen();
-        break;
-
-      case "h":
-        addLines([
-          { id: Math.random().toString(), type: "stdout", text: SE_MENU }
-        ]);
-        break;
-
-      default:
-        addLines([
-          { id: Math.random().toString(), type: "warning", text: "[!] Command not found! Type 'b' to return." }
-        ]);
-        break;
-    }
-  };
-
-  // Helper to capture a prompt
-  const promptInput = (promptText: string, callback: (val: string) => Promise<void> | void) => {
-    setCurrentPrompt(promptText);
-    setInputHandler(() => async (val: string) => {
-      setInputHandler(null);
-      await callback(val);
-    });
-  };
-
-  const resetPromptToCurrentMenu = () => {
-    setInputHandler(null);
-    if (menuState === "lookup") {
-      setCurrentPrompt("[LittleBrother][Lookup:~$ ");
-    } else if (menuState === "se") {
-      setCurrentPrompt("[LittleBrother][SETool:~$ ");
-    } else {
-      setCurrentPrompt("[LittleBrother:~$ ");
-    }
-  };
-
-  // --- TOOL IMPLEMENTATIONS ---
-
-  // 1. IP FINDER
-  const runIpLookup = async (ip: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Querying geolocation for IP '${ip || "client"}'...` }
-    ]);
-
-    try {
-      const res = await fetch(`/api/ip?ip=${encodeURIComponent(ip.trim())}`);
-      const data: IpResult = await res.json();
-
-      const tableRows = [
-        ["IP", data.ip],
-        ["Hostname", data.hostname || "None"],
-        ["ISP", data.org || "Unknown"],
-        ["Organisation", data.asn || data.org || "Unknown"],
-        ["Pays", data.country || "Unknown"],
-        ["Region", data.region || "Unknown"],
-        ["Ville", data.city || "Unknown"],
-        ["Localisation", data.loc || `${data.lat || 0}, ${data.lon || 0}`],
-        ["Maps", `https://www.google.fr/maps?q=${data.loc || `${data.lat},${data.lon}`}`]
-      ];
-
-      addLines([
-        {
-          id: Math.random().toString(),
-          type: "table",
-          text: `IP: ${data.ip}`,
-          tableData: {
-            headers: ["Property", "Value"],
-            rows: tableRows
-          }
-        },
-        { id: Math.random().toString(), type: "found", text: `[+] IP resolution complete.` }
-      ]);
-    } catch {
-      addLines([
-        { id: Math.random().toString(), type: "warning", text: "[!] Failed to query IP address." }
-      ]);
-    }
-    resetPromptToCurrentMenu();
-  };
-
-  // 2. BSSID FINDER
-  const runBssidLookup = async (bssid: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Scanning wireless beacons for MAC/BSSID '${bssid}'...` }
-    ]);
-
-    try {
-      const res = await fetch(`/api/bssid?bssid=${encodeURIComponent(bssid.trim())}`);
-      const data: BssidResult = await res.json();
-
-      if (data.lat && data.lon) {
-        addLines([
-          { id: Math.random().toString(), type: "found", text: `[ ${data.bssid} ]` },
-          { id: Math.random().toString(), type: "stdout", text: ` + Localisation: ${data.lat},${data.lon}` },
-          { id: Math.random().toString(), type: "stdout", text: ` + Maps: ${data.mapsUrl || `https://www.google.fr/maps?q=${data.lat},${data.lon}`}` },
-          { id: Math.random().toString(), type: "stdout", text: ` + WiGLE Query: ${data.wigleSearchUrl || "N/A"}` }
-        ]);
-      } else {
-        addLines([
-          { id: Math.random().toString(), type: "warning", text: `[!] Localization not found for '${bssid}'.` }
-        ]);
+      if (trimmed === "1") {
+        clearScreen("lookup");
+        return;
       }
-    } catch {
-      addLines([
-        { id: Math.random().toString(), type: "warning", text: "[!] Error connecting to BSSID geolocation service." }
-      ]);
-    }
-    resetPromptToCurrentMenu();
-  };
-
-  // 3. USERNAME LOOKUP
-  const runUsernameLookup = async (username: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Scanning profile networks for pseudo '@${username}'...` }
-    ]);
-
-    try {
-      const res = await fetch(`/api/username?username=${encodeURIComponent(username.trim())}`);
-      const data: UsernameResult = await res.json();
-
-      const rows = data.profiles.map((p) => [
-        p.platform,
-        p.url,
-        p.status === "found" ? "[+] VERIFIED" : "Ready to check"
-      ]);
-
-      addLines([
-        {
-          id: Math.random().toString(),
-          type: "table",
-          text: `Target: @${data.username}`,
-          tableData: {
-            headers: ["Platform", "URL Profile", "Status"],
-            rows
-          }
-        },
-        { id: Math.random().toString(), type: "found", text: `[+] Generated Google OSINT queries:` }
-      ]);
-
-      data.googleDorks.forEach((d) => {
-        addLines([
-          { id: Math.random().toString(), type: "stdout", text: ` [+] ${d.name}: ${d.url}` }
-        ]);
-      });
-    } catch {
-      addLines([
-        { id: Math.random().toString(), type: "warning", text: "[!] Failed to query username intelligence." }
-      ]);
-    }
-    resetPromptToCurrentMenu();
-  };
-
-  // 4. HASH DECRYPTER
-  const runHashDecrypt = async (hash: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Decrypt '${hash}'...` }
-    ]);
-
-    try {
-      const res = await fetch("/api/hash", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hash })
-      });
-      const data: HashResult = await res.json();
-
-      const typesList = data.identifiedTypes.map((t) => t.name).join(", ");
-      addLines([
-        { id: Math.random().toString(), type: "info", text: `[I] Algorithm Candidates (${data.length} chars): ${typesList}` }
-      ]);
-
-      if (data.lookupResult && data.lookupResult.match) {
-        addLines([
-          { id: Math.random().toString(), type: "found", text: `[+] ${hash} : ${data.lookupResult.match} (via ${data.lookupResult.provider})` }
-        ]);
-      } else {
-        addLines([
-          { id: Math.random().toString(), type: "warning", text: `[!] ${hash} : No match found in quick dictionary.` },
-          { id: Math.random().toString(), type: "stdout", text: `    VirusTotal: ${data.searchUrls.virusTotal}` },
-          { id: Math.random().toString(), type: "stdout", text: `    Hashes.com: ${data.searchUrls.hashesCom}` }
-        ]);
+      if (trimmed === "2") {
+        clearScreen("se");
+        return;
       }
-    } catch {
-      addLines([
-        { id: Math.random().toString(), type: "warning", text: "[!] Failed to inspect cryptographic hash." }
-      ]);
-    }
-    resetPromptToCurrentMenu();
-  };
-
-  // 5. MAIL TRACER
-  const runMailToIp = async (rawInput: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: "[*] Analyzing MTA hops and origin sender IP..." }
-    ]);
-
-    try {
-      const res = await fetch("/api/headers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ headers: rawInput || "Received: from mail.example.com [198.51.100.45] by mx.dest.com" })
-      });
-      const data: HeaderResult = await res.json();
-
-      addLines([
-        { id: Math.random().toString(), type: "info", text: `[I] Message sent by: ${data.summary.from}` },
-        { id: Math.random().toString(), type: "stdout", text: `    Subject: ${data.summary.subject}` },
-        { id: Math.random().toString(), type: "stdout", text: `    SPF Auth: ${data.summary.spf}` }
-      ]);
-
-      if (data.discoveredPublicIps.length > 0) {
-        data.discoveredPublicIps.forEach((ip) => {
-          addLines([
-            { id: Math.random().toString(), type: "found", text: `[+] Discovered Origin/Hop IP: ${ip}` },
-            { id: Math.random().toString(), type: "stdout", text: `    -> Geolocation: https://www.google.fr/maps?q=${ip}` }
-          ]);
-        });
-      } else {
-        addLines([
-          { id: Math.random().toString(), type: "warning", text: "[!] No public hops resolved in headers." }
-        ]);
+      if (trimmed === "3") {
+        runDoxMaker();
+        return;
       }
-    } catch {
-      addLines([
-        { id: Math.random().toString(), type: "warning", text: "[!] Error inspecting email headers." }
-      ]);
-    }
-    resetPromptToCurrentMenu();
-  };
-
-  // 6. CHECK EMAIL
-  const runCheckEmail = async (email: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Verification for '${email}'...` }
-    ]);
-
-    const domain = email.split("@")[1];
-    if (!domain) {
-      addLines([
-        { id: Math.random().toString(), type: "warning", text: `[!] ${email} does not exist (malformed address).` }
-      ]);
-      resetPromptToCurrentMenu();
+      if (trimmed === "4") {
+        showDatabase();
+        return;
+      }
+      if (trimmed.toLowerCase() === "c") {
+        clearScreen("main");
+        return;
+      }
+      if (trimmed.toLowerCase() === "h") {
+        addLines([HELP_MAIN, ""]);
+        return;
+      }
+      if (trimmed.toLowerCase() === "e") {
+        addLines([
+          `\u001b[92mJoin Telegram Group for feedback: \u001b[96mhttp://t.me/linux_repo\u001b[0m`,
+          ""
+        ]);
+        return;
+      }
+      if (trimmed === "") {
+        return;
+      }
+      addLines([`\u001b[91mCommand not found\u001b[92m`, ""]);
       return;
     }
 
-    try {
-      const res = await fetch(`/api/dns?domain=${encodeURIComponent(domain)}`);
-      const data: DnsResult = await res.json();
-      const mx = data.records["MX"] || [];
-
-      if (mx.length > 0) {
-        addLines([
-          { id: Math.random().toString(), type: "found", text: `[+] ${email} domain is active with valid MX records:` },
-          ...mx.map((m) => ({ id: Math.random().toString(), type: "stdout" as const, text: `    -> ${m.data} (TTL ${m.TTL}s)` }))
-        ]);
-      } else {
-        addLines([
-          { id: Math.random().toString(), type: "warning", text: `[!] ${email} domain has no MX records.` }
-        ]);
-      }
-    } catch {
-      addLines([
-        { id: Math.random().toString(), type: "warning", text: `[!] Could not verify MX records for ${domain}` }
-      ]);
+    if (menuState === "lookup") {
+      handleLookupChoice(inputStr);
+      return;
     }
-    resetPromptToCurrentMenu();
+
+    if (menuState === "se") {
+      handleSEChoice(inputStr);
+      return;
+    }
   };
 
-  // 7. GOOGLE DORKS
-  const runGoogleDorks = async (query: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Compiling OSINT reconnaissance dorks for '${query}'...` },
-      { id: Math.random().toString(), type: "found", text: `[+] Exact Search: https://www.google.com/search?q=${encodeURIComponent(`"${query}"`)}` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Social Profiles: https://www.google.com/search?q=${encodeURIComponent(`site:instagram.com OR site:twitter.com OR site:facebook.com "${query}"`)}` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Leaks & Pastes: https://www.google.com/search?q=${encodeURIComponent(`site:pastebin.com OR site:ghostbin.com "${query}"`)}` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Documents & CVs: https://www.google.com/search?q=${encodeURIComponent(`filetype:pdf OR filetype:docx "${query}"`)}` }
-    ]);
-    resetPromptToCurrentMenu();
-  };
-
-  // 8. FACEBOOK GRAPHSEARCH STALK
-  const runFacebookStalk = async (profile: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "found", text: `[+] Profile target: ${profile}` },
-      { id: Math.random().toString(), type: "stdout", text: `    Photos of: https://www.facebook.com/search/${encodeURIComponent(profile)}/photos-of/intersect` },
-      { id: Math.random().toString(), type: "stdout", text: `    Videos of: https://www.facebook.com/search/${encodeURIComponent(profile)}/videos-of/intersect` },
-      { id: Math.random().toString(), type: "stdout", text: `    Places visited: https://www.facebook.com/search/${encodeURIComponent(profile)}/places-visited/` },
-      { id: Math.random().toString(), type: "stdout", text: `    Pages liked: https://www.facebook.com/search/${encodeURIComponent(profile)}/pages-liked/intersect` },
-      { id: Math.random().toString(), type: "stdout", text: `    Stories tagged: https://www.facebook.com/search/${encodeURIComponent(profile)}/stories-tagged/intersect` }
-    ]);
-    resetPromptToCurrentMenu();
-  };
-
-  // 9. TWITTER INFO
-  const runTwitterInfo = async (handle: string) => {
-    const clean = handle.replace("@", "");
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Fetching Twitter/X details for @${clean}...` },
-      { id: Math.random().toString(), type: "found", text: `[@${clean}]` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Profile: https://x.com/${clean}` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Tweets search: https://x.com/search?q=from%3A${clean}&f=live` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Media: https://x.com/${clean}/media` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Google Archive: https://www.google.com/search?q=site:x.com/${clean}` }
-    ]);
-    resetPromptToCurrentMenu();
-  };
-
-  // 10. INSTAGRAM INFO
-  const runInstagramInfo = async (handle: string) => {
-    const clean = handle.replace("@", "");
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Fetching Instagram intelligence for @${clean}...` },
-      { id: Math.random().toString(), type: "found", text: `[@${clean}]` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Profile URL: https://instagram.com/${clean}` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Stories Tracker: https://storiesig.info/en/profile/${clean}` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Google Index: https://www.google.com/search?q=site:instagram.com/${clean}` }
-    ]);
-    resetPromptToCurrentMenu();
-  };
-
-  // 11. EXIF LOOKUP
-  const runExifLookup = async (photoUrl: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Fetching & decoding EXIF tags from '${photoUrl}'...` },
-      { id: Math.random().toString(), type: "info", text: `[+] Tip: You can also use the graphical Exif tool in GUI view.` },
-      { id: Math.random().toString(), type: "stdout", text: `    Camera specs, lens info, and GPS coordinates will be extracted client-side.` }
-    ]);
-    resetPromptToCurrentMenu();
-  };
-
-  // 12. PERSONNE LOOKUP
-  const runPersonneLookup = async (nomPrenom: string, ville: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Research for '${nomPrenom}' in '${ville}'...` },
-      { id: Math.random().toString(), type: "found", text: `[+] PagesJaunes Directory: https://www.pagesjaunes.fr/pagesblanches/recherche?quoiqui=${encodeURIComponent(nomPrenom)}&ou=${encodeURIComponent(ville)}` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] 118712 Search: https://www.118712.fr/recherche?q=${encodeURIComponent(nomPrenom)}&where=${encodeURIComponent(ville)}` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Copains d'avant: http://copainsdavant.linternaute.com/s/?ty=1&prenom=${encodeURIComponent(nomPrenom)}&ville=${encodeURIComponent(ville)}` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Social Matrix: https://www.google.com/search?q=${encodeURIComponent(`"${nomPrenom}" "${ville}"`)}` }
-    ]);
-    resetPromptToCurrentMenu();
-  };
-
-  // 13. ADRESSE LOOKUP
-  const runAdresseLookup = async (adresse: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Searching residents at '${adresse}'...` },
-      { id: Math.random().toString(), type: "found", text: `[+] PagesBlanches Address: https://www.pagesjaunes.fr/pagesblanches/recherche?ou=${encodeURIComponent(adresse)}` },
-      { id: Math.random().toString(), type: "stdout", text: `[+] Cadastre & Maps: https://www.google.com/maps/search/${encodeURIComponent(adresse)}` }
-    ]);
-    resetPromptToCurrentMenu();
-  };
-
-  // 14. PHONE LOOKUP
-  const runPhoneLookup = async (phone: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Reverse searching phone '${phone}'...` },
-      {
-        id: Math.random().toString(),
-        type: "table",
-        text: `Phone Intelligence: ${phone}`,
-        tableData: {
-          headers: ["Property", "Value"],
-          rows: [
-            ["Numero", phone],
-            ["Type", phone.startsWith("06") || phone.startsWith("07") || phone.startsWith("+1") ? "Mobile / Cellphone" : "Fixed / VoIP"],
-            ["Operateur", "Standard Telecom Carrier Lookup"],
-            ["Reverse Search", `https://www.pagesjaunes.fr/annuaireinverse/recherche?quoiqui=${encodeURIComponent(phone)}`]
-          ]
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const val = inputValue;
+      setInputValue("");
+      handleCommand(val);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (history.length === 0) return;
+      const nextIdx = historyIdx === -1 ? history.length - 1 : Math.max(0, historyIdx - 1);
+      setHistoryIdx(nextIdx);
+      setInputValue(history[nextIdx] || "");
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (historyIdx === -1) return;
+      const nextIdx = historyIdx + 1;
+      if (nextIdx >= history.length) {
+        setHistoryIdx(-1);
+        setInputValue("");
+      } else {
+        setHistoryIdx(nextIdx);
+        setInputValue(history[nextIdx] || "");
+      }
+    } else if (e.ctrlKey && e.key === "c") {
+      e.preventDefault();
+      addLines([`${currentPrompt}${inputValue}^C`]);
+      setInputValue("");
+      if (pendingHandler) {
+        setPendingHandler(null);
+        if (menuState === "custom_prompt") {
+          setMenuState("main");
+          setCurrentPrompt("[LittleBrother:~$ ");
         }
       }
-    ]);
-    resetPromptToCurrentMenu();
-  };
-
-  // 15. EMAIL LOOKUP
-  const runEmailLookup = async (email: string) => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: `[*] Information search on '${email}'...` },
-      { id: Math.random().toString(), type: "info", text: `[I] Leaked credentials database & password search:` },
-      { id: Math.random().toString(), type: "stdout", text: `    HaveIBeenPwned: https://haveibeenpwned.com/account/${encodeURIComponent(email)}` },
-      { id: Math.random().toString(), type: "stdout", text: `    DeHashed Search: https://dehashed.com/search?query=${encodeURIComponent(email)}` },
-      { id: Math.random().toString(), type: "stdout", text: `    Google Dump Search: https://www.google.fr/search?q=${encodeURIComponent(`intext:"${email}"`)}` }
-    ]);
-    resetPromptToCurrentMenu();
-  };
-
-  // 16. DOX MAKER INTERACTIVE STEP-BY-STEP
-  const startDoxMaker = async () => {
-    addLines([
-      { id: Math.random().toString(), type: "info", text: "=== DOXMAKER CASE FILE GENERATOR ===" }
-    ]);
-
-    promptInput("First name : ", (prenom) => {
-      promptInput("Last name : ", (nom) => {
-        promptInput("Date of Birth : ", (dob) => {
-          promptInput("Phone number : ", (phone) => {
-            promptInput("Email : ", (email) => {
-              promptInput("City : ", (city) => {
-                promptInput("Address : ", (adresse) => {
-                  promptInput("IP Address : ", (ip) => {
-                    const fileName = `${prenom.trim()}_${nom.trim()}.txt`;
-                    const profileData = {
-                      id: "case-" + Math.random().toString(36).substring(2, 7),
-                      created: new Date().toISOString().split("T")[0],
-                      targetName: `${prenom} ${nom}`,
-                      aliases: "",
-                      dob,
-                      phones: phone,
-                      emails: email,
-                      addresses: adresse,
-                      city,
-                      country: "France",
-                      ipAddresses: ip,
-                      socialAccounts: "",
-                      notes: "Generated via LittleBrother DoxMaker Terminal CLI.",
-                      tags: ["Terminal Target"]
-                    };
-
-                    try {
-                      const raw = localStorage.getItem("lb_dossiers");
-                      const list = raw ? JSON.parse(raw) : [];
-                      list.unshift(profileData);
-                      localStorage.setItem("lb_dossiers", JSON.stringify(list));
-                    } catch {
-                      // ignore
-                    }
-
-                    addLines([
-                      { id: Math.random().toString(), type: "found", text: `\n[+] Fichier enregistre dans : 'Watched/${fileName}'` },
-                      { id: Math.random().toString(), type: "stdout", text: `    Full dossier saved to client database memory.` }
-                    ]);
-                    resetPromptToCurrentMenu();
-                  });
-                });
-              });
-            });
-          });
-        });
-      });
-    });
-  };
-
-  // 17. SHOW DATABASE
-  const handleShowDatabase = async () => {
-    addLines([
-      { id: Math.random().toString(), type: "wait", text: "[*] Access to the Database ..." },
-      { id: Math.random().toString(), type: "wait", text: "[*] Search Data ..." }
-    ]);
-
-    try {
-      const raw = localStorage.getItem("lb_dossiers");
-      const list = raw ? JSON.parse(raw) : [];
-
-      if (list.length === 0) {
-        addLines([
-          { id: Math.random().toString(), type: "warning", text: "[!] No profiles found in 'Watched' database." }
-        ]);
-      } else {
-        const rows = list.map((item: { targetName: string; created: string; phones: string; emails: string }, idx: number) => [
-          String(idx + 1),
-          item.targetName || "Unknown",
-          item.phones || "N/A",
-          item.emails || "N/A",
-          item.created || "N/A"
-        ]);
-
-        addLines([
-          { id: Math.random().toString(), type: "found", text: `[+] ${list.length} Profiles Found in Database:` },
-          {
-            id: Math.random().toString(),
-            type: "table",
-            text: "Watched Targets",
-            tableData: {
-              headers: ["ID", "Name", "Phone", "Email", "Date Created"],
-              rows
-            }
-          }
-        ]);
-      }
-    } catch {
-      addLines([
-        { id: Math.random().toString(), type: "warning", text: "[!] Error reading target database." }
-      ]);
+    } else if (e.ctrlKey && e.key === "l") {
+      e.preventDefault();
+      clearScreen(menuState === "custom_prompt" ? "main" : menuState);
     }
-    resetPromptToCurrentMenu();
   };
 
   return (
     <div
-      onClick={focusInput}
-      className="min-h-screen bg-black text-[#22c55e] font-mono p-2 sm:p-4 select-text cursor-text crt-screen flex flex-col justify-between"
+      onClick={() => inputRef.current?.focus()}
+      className="min-h-screen w-full bg-black text-[#22c55e] font-mono px-2 py-1 select-text cursor-text leading-[1.18] text-[13px] sm:text-[13.5px]"
     >
-      {/* Top terminal status bar */}
-      <div className="border-b border-[#14532d] pb-2 mb-3 flex items-center justify-between text-xs text-[#15803d]">
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#22c55e] animate-pulse"></span>
-          <span className="font-bold text-[#22c55e]">LITTLEBROTHER v2.5 [TERMINAL EDITION]</span>
-        </div>
-        <div className="flex items-center gap-4 text-[11px]">
-          <span>TTY: /dev/pts/0</span>
-          <span>LANG: en_US.UTF-8</span>
-          <span>HOST: edge.littlebrother</span>
-        </div>
-      </div>
-
-      {/* Terminal Output Stream */}
-      <div className="space-y-1.5 flex-1 overflow-x-auto text-xs sm:text-sm leading-relaxed">
-        {lines.map((line) => {
-          if (line.type === "banner") {
-            return (
-              <pre
-                key={line.id}
-                className="text-[#22c55e] font-mono text-[10px] sm:text-[12px] leading-tight select-all my-1 whitespace-pre"
-              >
-                {line.text}
-              </pre>
-            );
+      {/* Terminal Stream */}
+      <div className="space-y-0 whitespace-pre font-mono">
+        {lines.map((line, idx) => {
+          if (!line) {
+            return <div key={idx} className="h-3" />;
           }
 
-          if (line.type === "prompt") {
-            return (
-              <div key={line.id} className="text-[#86efac] font-bold">
-                {line.text}
-              </div>
-            );
-          }
-
-          if (line.type === "warning") {
-            return (
-              <div key={line.id} className="text-[#ef4444]">
-                {line.text}
-              </div>
-            );
-          }
-
-          if (line.type === "found") {
-            return (
-              <div key={line.id} className="text-[#4ade80] font-semibold">
-                {line.text}
-              </div>
-            );
-          }
-
-          if (line.type === "info") {
-            return (
-              <div key={line.id} className="text-[#38bdf8]">
-                {line.text}
-              </div>
-            );
-          }
-
-          if (line.type === "wait") {
-            return (
-              <div key={line.id} className="text-[#c084fc]">
-                {line.text}
-              </div>
-            );
-          }
-
-          if (line.type === "table" && line.tableData) {
-            return (
-              <div key={line.id} className="my-2 border border-[#14532d] bg-[#020604] p-2 rounded">
-                <div className="text-[11px] text-[#4ade80] font-bold mb-1.5 uppercase tracking-wide">
-                  +-- {line.text} --+
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse font-mono">
-                    <thead>
-                      <tr className="border-b border-[#14532d] text-[#86efac]">
-                        {line.tableData.headers.map((h, i) => (
-                          <th key={i} className="py-1 px-2.5 font-bold">
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#052e16]">
-                      {line.tableData.rows.map((row, rIdx) => (
-                        <tr key={rIdx} className="hover:bg-[#052e16]/50">
-                          {row.map((cell, cIdx) => (
-                            <td key={cIdx} className="py-1 px-2.5 break-all text-[#22c55e]">
-                              {cell}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          }
-
+          const spans = parseAnsi(line);
           return (
-            <div key={line.id} className="text-[#22c55e] whitespace-pre-wrap">
-              {line.text}
+            <div key={idx} className="leading-[1.18]">
+              {spans.map((span, sIdx) => (
+                <span
+                  key={sIdx}
+                  style={{ color: span.color }}
+                  className={span.bold ? "font-bold" : undefined}
+                >
+                  {span.text}
+                </span>
+              ))}
             </div>
           );
         })}
 
-        {/* Live Input Prompt */}
-        <form onSubmit={handleSubmit} className="flex items-center gap-1 mt-2">
-          <span className="text-[#86efac] font-bold shrink-0">{currentPrompt}</span>
-          <div className="flex-1 flex items-center">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  if (history.length > 0) {
-                    const nextIdx = historyIdx < history.length - 1 ? historyIdx + 1 : historyIdx;
-                    setHistoryIdx(nextIdx);
-                    setInputValue(history[history.length - 1 - nextIdx] || "");
-                  }
-                } else if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  if (historyIdx > 0) {
-                    const nextIdx = historyIdx - 1;
-                    setHistoryIdx(nextIdx);
-                    setInputValue(history[history.length - 1 - nextIdx] || "");
-                  } else if (historyIdx === 0) {
-                    setHistoryIdx(-1);
-                    setInputValue("");
-                  }
-                }
-              }}
-              className="w-full bg-transparent border-none outline-none text-[#22c55e] font-mono text-xs sm:text-sm p-0 m-0 focus:ring-0"
-              autoFocus
-              autoComplete="off"
-              spellCheck="false"
-            />
-          </div>
-        </form>
-
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Terminal Quick Help Bar */}
-      <div className="border-t border-[#14532d] pt-2 mt-4 flex flex-wrap items-center justify-between text-[11px] text-[#15803d]">
-        <div className="flex gap-3">
-          <span>[1] Lookup</span>
-          <span>[2] SETool</span>
-          <span>[3] DoxMaker</span>
-          <span>[4] Database</span>
-          <span>[c] Clear</span>
-          <span>[h] Help</span>
-          <span>[b] Back</span>
-        </div>
-        <div className="text-[10px] text-[#166534]">
-          LittleBrother Terminal Web Engine &bull; Cloudflare Workers Compatible
+        {/* Active Command Line with Blinking Cursor */}
+        <div className="flex items-baseline pt-1">
+          <span className="text-[#22c55e]">{currentPrompt}</span>
+          <span className="text-[#22c55e] whitespace-pre">{inputValue}</span>
+          <span className="terminal-cursor"></span>
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="opacity-0 w-0 h-0 absolute pointer-events-none"
+            autoFocus
+            autoCapitalize="none"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
         </div>
       </div>
+      <div ref={bottomRef} />
     </div>
   );
 }

@@ -57,53 +57,75 @@ function identifyHash(clean: string): HashType[] {
   return candidates;
 }
 
+export async function GET(req: NextRequest) {
+  const hash = req.nextUrl.searchParams.get("hash") || "";
+  return handleHash(hash);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { hash } = await req.json();
-    const clean = (hash || "").trim();
-
-    if (!clean) {
-      return NextResponse.json({ error: "No hash provided" }, { status: 400 });
-    }
-
-    const identified = identifyHash(clean);
-
-    // Cross-reference common lookup databases via public APIs
-    // e.g. Hashes.com / VirusTotal / md5decrypt
-    let matchResult: string | null = null;
-    let source: string | null = null;
-
-    // Check MD5 against public API if it's 32 chars
-    if (clean.length === 32 && /^[a-fA-F0-9]{32}$/.test(clean)) {
-      try {
-        const checkUrl = `https://api.dehash.lt/check.php?hash=${clean}`;
-        const res = await fetch(checkUrl, { signal: AbortSignal.timeout(3000) });
-        if (res.ok) {
-          const text = await res.text();
-          if (text && !text.includes("Not Found") && !text.includes("error")) {
-            matchResult = text.trim();
-            source = "public-hash-lookup";
-          }
-        }
-      } catch {
-        // ignore timeout
-      }
-    }
-
-    return NextResponse.json({
-      hash: clean,
-      length: clean.length,
-      identifiedTypes: identified,
-      lookupResult: matchResult ? { match: matchResult, provider: source } : null,
-      searchUrls: {
-        hashesCom: `https://hashes.com/en/decrypt/hash`,
-        virusTotal: `https://www.virustotal.com/gui/search/${clean}`,
-        google: `https://www.google.com/search?q="${clean}"`,
-        hashcatGuide: "https://hashcat.net/wiki/doku.php?id=example_hashes"
-      }
-    });
+    return handleHash(hash || "");
   } catch (err: unknown) {
     const error = err as Error;
     return NextResponse.json({ error: error.message || "Failed to inspect hash" }, { status: 500 });
   }
+}
+
+async function handleHash(hash: string) {
+  const clean = (hash || "").trim();
+
+  if (!clean) {
+    return NextResponse.json({ error: "No hash provided" }, { status: 400 });
+  }
+
+  const identified = identifyHash(clean);
+
+  // Cross-reference common lookup databases via public APIs
+  let matchResult: string | null = null;
+  let source: string | null = null;
+
+  // Check known hashes dictionary or public lookup
+  const knownHashes: Record<string, string> = {
+    "5d41402abc4b2a76b9719d911017c592": "hello",
+    "21232f297a57a5a743894a0e4a801fc3": "admin",
+    "098f6bcd4621d373cade4e832627b4f6": "test",
+    "e10adc3949ba59abbe56e057f20f883e": "123456",
+    "25d55ad283aa400af464c76d713c07ad": "12345678",
+    "fcea920f7412b4da7be0cf6f11c67286": "password",
+    "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8": "password",
+    "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918": "admin",
+  };
+
+  if (knownHashes[clean.toLowerCase()]) {
+    matchResult = knownHashes[clean.toLowerCase()];
+    source = "rainbow-table";
+  } else if (clean.length === 32 && /^[a-fA-F0-9]{32}$/.test(clean)) {
+    try {
+      const checkUrl = `https://api.dehash.lt/check.php?hash=${clean}`;
+      const res = await fetch(checkUrl, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) {
+        const text = await res.text();
+        if (text && !text.includes("Not Found") && !text.includes("error")) {
+          matchResult = text.trim();
+          source = "public-hash-lookup";
+        }
+      }
+    } catch {
+      // ignore timeout
+    }
+  }
+
+  return NextResponse.json({
+    hash: clean,
+    length: clean.length,
+    identifiedTypes: identified,
+    lookupResult: matchResult ? { match: matchResult, provider: source } : null,
+    searchUrls: {
+      hashesCom: `https://hashes.com/en/decrypt/hash`,
+      virusTotal: `https://www.virustotal.com/gui/search/${clean}`,
+      google: `https://www.google.com/search?q="${clean}"`,
+      hashcatGuide: "https://hashcat.net/wiki/doku.php?id=example_hashes"
+    }
+  });
 }

@@ -1,20 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "LittleBrother Web - Cloudflare OSINT Intelligence Suite",
-  description: "Modern edge-deployed OSINT analysis suite with IP geolocation, Wi-Fi BSSID mapping, email header tracing, EXIF extraction, hash intelligence, and target dossiers.",
+  title: "LittleBrother",
+  description: "Information Gathering (OSINT) Framework",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
@@ -23,11 +15,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
-    >
-      <body className="min-h-full flex flex-col bg-black text-[#22c55e]">{children}</body>
+    <html lang="en" className="h-full bg-black">
+      <body className="min-h-full m-0 p-0 bg-black text-[#22c55e] selection:bg-[#22c55e] selection:text-black">
+        {children}
+      </body>
     </html>
   );
 }
