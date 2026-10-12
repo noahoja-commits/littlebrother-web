@@ -1,113 +1,87 @@
-# LittleBrother v2.1
-LittleBrother is an information collection tool (OSINT) which aims to carry out research on a French, Swiss, Luxembourg or Belgian and other person. Also it provides various modules that allow efficient searches world wide. This is more powerful than UserRecon. LittleBrother does not require an API key or login ID.
+# LittleBrother OSINT Web Suite (Cloudflare Edition)
 
-## Note:
-I am not the main developer of this tool. I just tried to modify this and add English Language and some other things. Main repositories:
-- First created by https://github.com/Lulz3xploit
-- I edited from https://github.com/Oprax
+A modern, high-performance web interface and edge API for **LittleBrother** OSINT, engineered to run natively on **Cloudflare Workers** and **Cloudflare Pages**.
 
-## Disclaimer:
-LittleBrother was developed to do some research on yourself and to see the private and sensitive information you can leave behind on social media.  I in no way encourage the use of this tool on anyone other than yourself or to use this tool improperly.  The authors of LittleBrother cannot be held responsible for the use of its tool.
+Based on the original Python OSINT framework by [AbirHasan2005/LittleBrother](https://github.com/AbirHasan2005/LittleBrother) and [Lulz3xploit](https://github.com/Lulz3xploit/LittleBrother).
 
-![Screenshot](https://github.com/AbirHasan2005/LittleBrother/blob/master/capture.png)
+---
 
-## Installation for Linux:
-You must have Git and Python3 installed on your machine.
+## ✨ Features & Edge Modules
+
+1. **IP Geolocation & ASN Intelligence (`/api/ip`)**
+   - Real-time IP resolution, ISP, Autonomous System Number (ASN), routing coordinates, and country flags.
+   - Integrates with Cloudflare Edge headers (`CF-Connecting-IP`, `CF-IPCountry`).
+   - Interactive OpenStreetMap and Google Maps links.
+
+2. **BSSID & Wi-Fi Geolocation (`/api/bssid`)**
+   - Resolves wireless access point MAC addresses (BSSID) to GPS physical coordinates.
+   - Cross-references open wireless beacon databases and WiGLE.
+
+3. **Mail-to-IP & Header Analyzer (`/api/headers`)**
+   - Extracts origin sender IPs, intermediate MTA relays, and hops from RFC 822 raw email headers.
+   - Inspects SPF authentication, DKIM signatures, and DMARC headers.
+
+4. **EXIF & Photo GPS Extractor (Client-Side WASM)**
+   - Parses camera hardware (Make, Model, Software, Lens, ISO, Aperture).
+   - Extracts embedded GPS coordinates and displays an interactive map of the capture location.
+   - Runs 100% locally in browser memory for complete investigator confidentiality.
+
+5. **Cryptographic Hash Intelligence (`/api/hash`)**
+   - Identifies algorithm families (MD5, SHA-1, SHA-256, NTLM, bcrypt, Argon2, etc.).
+   - Instant search against public dictionary tables and VirusTotal/Hashes.com.
+
+6. **Username Recon & Social Footprint (`/api/username`)**
+   - Scans 16+ key social and developer platforms (GitHub, X/Twitter, Instagram, LinkedIn, Reddit, Telegram, etc.).
+   - Generates Google Dorks to find leaked credentials, paste dumps, and profile traces.
+
+7. **Encrypted DNS over HTTPS (`/api/dns`)**
+   - Zero-leak recursive DNS queries over Cloudflare's secure 1.1.1.1 DoH endpoint (A, AAAA, MX, TXT, NS, SOA).
+
+8. **Dossier Case File Manager (DoxMaker)**
+   - Create, edit, and organize investigation targets.
+   - Client-side persistent local storage.
+   - Export full case reports directly to Markdown.
+
+---
+
+## 🚀 Running Locally
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:38450](http://localhost:38450) in your browser.
+
+---
+
+## ☁️ Deploying to Cloudflare
+
+### Option A: Cloudflare Pages (Git Integration - Recommended)
+1. Push your repository to GitHub or GitLab.
+2. In the **Cloudflare Dashboard**, navigate to **Workers & Pages** &rarr; **Create application** &rarr; **Pages** &rarr; **Connect to Git**.
+3. Select your repository and choose the **Next.js** framework preset:
+   - **Build command:** `npx @cloudflare/next-on-pages@1`
+   - **Build output directory:** `.vercel/output/static`
+4. Set the compatibility flag in Settings: `nodejs_compat`.
+5. Deploy!
+
+### Option B: Deploy via Wrangler CLI
+Deploy directly from your terminal:
+```bash
+# 1. Authenticate with your Cloudflare account
+npx wrangler login
+
+# 2. Build and deploy
+npx @cloudflare/next-on-pages
+npx wrangler pages deploy .vercel/output/static
 ```
-sudo apt install git python3
-git clone https://github.com/AbirHasan2005/LittleBrother
-cd LittleBrother
-python3 -m pip install -r requirements.txt
-python3 littlebrother.py
-```
 
-## Installation for Termux:
-You must have Git and Python3 installed on your machine.
-```
-apt update && apt upgrade
-pkg install git python3
-git clone https://github.com/AbirHasan2005/LittleBrother
-cd LittleBrother
-pip3 install -r requirements.txt
-python3 littlebrother.py
-```
+---
 
-## Installation for Windows:
-1. Setup python3 on windows
-2. Get Downloaded:
-	- If you didn't setup `git` on your Windows than Download and unzip LittleBrother (master.zip)
-	- Or if you had setup `git` on your Windows than use this command: `git clone https://github.com/AbirHasan2005/LittleBrother` in Command Prompt or PowerShell.
-3. From Command Prompt or PowerShell give the below command to jump to LittleBrother Directory:
-```
-cd LittleBrother # If downloaded via git clone command
-```
-If your Python version 3 in WindowsOS starts with `python` command than use the below command:
-```
-python -m pip install -r requirements.txt
-python littlebrother.py
-```
-If your Python version 3 in WindowsOS starts with `python3` command than use the below command:
-```
-python3 -m pip install -r requirements.txt
-python3 littlebrother.py
-```
-For more help join Telegram Group: http://t.me/linux_repo
-
-## Compatible with:
-- Windows
-- Termux
-- MacOS
-- Linux
-
-## Python version:
-- Python3
-
-## Python Modules:
-- requests
-- bs4
-- terminaltables
-- exifread
-- colorama
-- dnspython
-
-## Features:
-- Lookup:
-	- Phone lookup
-	- Email lookup
-	- Last name / First name lookup
-	- Surname lookup
-	- Addresse lookup
-	- Mail ip locator
-	- Ip locator
-	- Bssid locator
-	- Dox maker
-	- Exif read (ALPHA)
-	- Google search
-	- Twitter
-	- Instagram
-	- Facebook
-	- LinkedIn employee search (New!)
-
-- Autre outils:
-	- Hash Bruteforce
-
-- Social engineering:
-	- Spam mail
-	- Spoof phone
-
-- Profiler (New!)
-	- Profiler an profile
-	- Database management
-	- Profile creator
-
-## If you find any problems, issues, Mistakes or if you want to feedback or chat than join Telegram Group(Link Given Below)
-### Telegram Group: http://t.me/linux_repo
-
-## Follow on:
-### Twitter: https://twitter.com/AbirHasan2005
-### Instagram: https://instagram.com/AbirHasan2005 
-### Facebook: https://facebook.com/AbirHasan2005
-### GitHub: https://github.com/AbirHasan2005
-
-## Donate for helping me:
-[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://paypal.me/AbirHasan2005)
+## 🔒 Security & Privacy Notice
+All reconnaissance modules operate passively. Image EXIF analysis and Dossier management run entirely within your local browser sandbox to preserve target and investigator operational security.
