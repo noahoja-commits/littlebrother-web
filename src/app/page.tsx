@@ -181,7 +181,7 @@ function DeployGuide() {
             <li>Connect your GitHub repository: <code className="text-sky-300">noahoja-commits/littlebrother-web</code>.</li>
             <li>Configure the build settings:
               <div className="bg-slate-900 p-2.5 rounded mt-2 border border-slate-800 font-mono text-[11px] text-sky-300 space-y-1">
-                <div>Build command: <span className="text-emerald-400">npm run build</span></div>
+                <div>Build command: <span className="text-emerald-400">npx opennextjs-cloudflare build</span></div>
                 <div>Deploy command: <span className="text-emerald-400">npx wrangler deploy</span></div>
               </div>
             </li>
