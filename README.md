@@ -61,24 +61,23 @@ Based on the original Python OSINT framework by [AbirHasan2005/LittleBrother](ht
 
 ## ☁️ Deploying to Cloudflare
 
-### Option A: Cloudflare Pages (Git Integration - Recommended)
-1. Push your repository to GitHub or GitLab.
-2. In the **Cloudflare Dashboard**, navigate to **Workers & Pages** &rarr; **Create application** &rarr; **Pages** &rarr; **Connect to Git**.
-3. Select your repository and choose the **Next.js** framework preset:
-   - **Build command:** `npx @cloudflare/next-on-pages@1`
-   - **Build output directory:** `.vercel/output/static`
-4. Set the compatibility flag in Settings: `nodejs_compat`.
-5. Deploy!
+This repository uses `@opennextjs/cloudflare`, the modern official Next.js adapter for Cloudflare Workers & Pages.
 
-### Option B: Deploy via Wrangler CLI
-Deploy directly from your terminal:
+### Option A: Cloudflare Dashboard (Workers / Pages Git Integration)
+1. In the **Cloudflare Dashboard**, navigate to **Workers & Pages** &rarr; **Create application** &rarr; select **Workers** or **Pages** &rarr; **Connect to Git**.
+2. Select repository: `noahoja-commits/littlebrother-web`.
+3. In Build settings:
+   - **Build command:** `npm run build`
+   - **Deploy command:** `npx wrangler deploy` (or `npx opennextjs-cloudflare deploy`)
+4. Cloudflare automatically uses `wrangler.jsonc`, which bundles the Worker from `.open-next/worker.js` and assets from `.open-next/assets`.
+
+### Option B: Deploy via CLI
 ```bash
 # 1. Authenticate with your Cloudflare account
 npx wrangler login
 
 # 2. Build and deploy
-npx @cloudflare/next-on-pages
-npx wrangler pages deploy .vercel/output/static
+npm run deploy
 ```
 
 ---

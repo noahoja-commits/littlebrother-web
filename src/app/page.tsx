@@ -170,40 +170,37 @@ function DeployGuide() {
           <Cloud className="w-5 h-5" /> Deploying LittleBrother to Cloudflare
         </h2>
         <p className="text-slate-400 leading-relaxed">
-          This web application is built with universal edge-compatible Next.js Route Handlers (`runtime = &quot;edge&quot;`). You can deploy it to Cloudflare in minutes using either **Cloudflare Pages** or **Cloudflare Workers**.
+          This web application is configured with the official <strong>@opennextjs/cloudflare</strong> adapter. Cloudflare compiles the Next.js app, static assets, and Route Handlers into a production Cloudflare Worker.
         </p>
 
-        {/* Method 1: Cloudflare Pages (Easiest) */}
+        {/* Method 1: Cloudflare Dashboard Git Integration */}
         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-          <div className="text-sm font-bold text-emerald-400">Method 1: Cloudflare Pages Git Integration (Recommended)</div>
+          <div className="text-sm font-bold text-emerald-400">Method 1: Cloudflare Workers &amp; Pages Git CI/CD</div>
           <ol className="list-decimal list-inside space-y-2 text-slate-300">
-            <li>Push this repository to GitHub or GitLab.</li>
-            <li>Go to the <strong>Cloudflare Dashboard</strong> &rarr; <strong>Workers &amp; Pages</strong> &rarr; <strong>Create application</strong> &rarr; <strong>Pages</strong>.</li>
-            <li>Connect your Git repository.</li>
-            <li>Select the <strong>Next.js</strong> build preset:
-              <div className="bg-slate-900 p-2.5 rounded mt-2 border border-slate-800 font-mono text-[11px] text-sky-300">
-                Build command: npx @cloudflare/next-on-pages@1<br />
-                Build output directory: .vercel/output/static
+            <li>In the <strong>Cloudflare Dashboard</strong>, go to <strong>Workers &amp; Pages</strong> &rarr; <strong>Create application</strong> &rarr; <strong>Workers</strong> or <strong>Pages</strong>.</li>
+            <li>Connect your GitHub repository: <code className="text-sky-300">noahoja-commits/littlebrother-web</code>.</li>
+            <li>Configure the build settings:
+              <div className="bg-slate-900 p-2.5 rounded mt-2 border border-slate-800 font-mono text-[11px] text-sky-300 space-y-1">
+                <div>Build command: <span className="text-emerald-400">npm run build</span></div>
+                <div>Deploy command: <span className="text-emerald-400">npx wrangler deploy</span></div>
               </div>
             </li>
-            <li>Add compatibility flag in Environment Variables if prompted: <code className="text-amber-400">nodejs_compat</code>.</li>
-            <li>Click <strong>Save and Deploy</strong>. Cloudflare will provision an SSL-secured URL on <code className="text-sky-400">*.pages.dev</code>.</li>
+            <li>Cloudflare will read <code className="text-slate-200">wrangler.jsonc</code> which points directly to <code className="text-sky-400">.open-next/worker.js</code> and <code className="text-sky-400">.open-next/assets</code>.</li>
+            <li>Click <strong>Save and Deploy</strong>.</li>
           </ol>
         </div>
 
         {/* Method 2: Wrangler CLI */}
         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-          <div className="text-sm font-bold text-sky-400">Method 2: Deploy from Terminal with Wrangler</div>
+          <div className="text-sm font-bold text-sky-400">Method 2: One-Command CLI Deploy</div>
           <p className="text-slate-400">
-            Login and deploy right from your shell with the included <code className="text-slate-200">wrangler.toml</code>:
+            Deploy right from your shell with Wrangler:
           </p>
           <div className="bg-slate-900 p-3 rounded border border-slate-800 text-slate-200 space-y-1">
             <div><span className="text-slate-500"># 1. Authenticate with Cloudflare</span></div>
             <div className="text-emerald-400">npx wrangler login</div>
-            <div className="pt-2"><span className="text-slate-500"># 2. Build for Cloudflare Pages/Workers</span></div>
-            <div className="text-emerald-400">npx @cloudflare/next-on-pages</div>
-            <div className="pt-2"><span className="text-slate-500"># 3. Deploy to production</span></div>
-            <div className="text-emerald-400">npx wrangler pages deploy .vercel/output/static</div>
+            <div className="pt-2"><span className="text-slate-500"># 2. Build OpenNext bundle and deploy</span></div>
+            <div className="text-emerald-400">npm run deploy</div>
           </div>
         </div>
 
