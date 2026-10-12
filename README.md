@@ -67,7 +67,7 @@ This repository uses `@opennextjs/cloudflare`, the modern official Next.js adapt
 1. In the **Cloudflare Dashboard**, navigate to **Workers & Pages** &rarr; **Create application** &rarr; select **Workers** or **Pages** &rarr; **Connect to Git**.
 2. Select repository: `noahoja-commits/littlebrother-web`.
 3. In Build settings:
-   - **Build command:** `npx opennextjs-cloudflare build`
+   - **Build command:** `npm run build`
    - **Deploy command:** `npx wrangler deploy`
 4. Cloudflare automatically uses `wrangler.jsonc`, which bundles the Worker from `.open-next/worker.js` and assets from `.open-next/assets`.
 
