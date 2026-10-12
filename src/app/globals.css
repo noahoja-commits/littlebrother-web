@@ -2,12 +2,12 @@
 
 :root {
   --background: #000000;
-  --foreground: #22c55e;
+  --foreground: #00ff00;
 }
 
 html, body {
   background-color: #000000;
-  color: #22c55e;
+  color: #00ff00;
   margin: 0;
   padding: 0;
   min-height: 100vh;
@@ -39,9 +39,9 @@ html, body {
 
 .terminal-cursor {
   display: inline-block;
-  width: 8px;
+  width: 8.5px;
   height: 1.15em;
-  background-color: #22c55e;
+  background-color: #00ff00;
   vertical-align: text-bottom;
   animation: terminal-blink 1s infinite;
 }

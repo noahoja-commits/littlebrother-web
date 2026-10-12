@@ -3,33 +3,33 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 
 // Exact header14 from littlebrother.py / capture.png
-const HEADER_14 = `    __    _ __  __  __     ____             __  __             
+const HEADER_14 = `\u001b[92m    __    _ __  __  __     ____             __  __             
    / /   (_) /_/ /_/ /__  / __ )_________  / /_/ /_  ___  _____
   / /   / / __/ __/ / _ \\/ __  / ___/ __ \\/ __/ __ \\/ _ \\/ ___/
  / /___/ / /_/ /_/ /  __/ /_/ / /  / /_/ / /_/ / / /  __/ /    
-/_____/_/\\__/\\__/_/\\___/_____/_/   \\____/\\__/_/ /_/\\___/_/     `;
+/_____/_/\\__/\\__/_/\\___/_____/_/   \\____/\\__/_/ /_/\\___/_/     \u001b[0m`;
 
-const MAIN_OPTION = `\u001b[92m [1] Lookup
- [2] Social engineering tool
- [3] Make file
- [4] Show Database
- [e] Exit script    [h] Help Message    [c] Clear Screen\u001b[0m`;
+const MAIN_OPTION = `\u001b[92m[1] Lookup
+[2] Social engineering tool
+[3] Make file
+[4] Show Database
+[e] Exit script    [h] Help Message    [c] Clear Screen\u001b[0m`;
 
-const LOOKUP_OPTION = `\u001b[92m [1] Personne lookup          [8] Mail tracer
- [2] Username lookup          [9] Exif data
- [3] Adresse lookup           [10] Google search
- [4] Phone lookup             [11] Facebook GraphSearch
- [5] IP lookup                [12] twitter info
- [6] SSID locator             [13] instagram info
- [7] Email lookup             [14] Check email
-                              [15] Hash decrypter
+const LOOKUP_OPTION = `\u001b[92m[1] Personne lookup          [8] Mail tracer
+[2] Username lookup          [9] Exif data
+[3] Adresse lookup           [10] Google search
+[4] Phone lookup             [11] Facebook GraphSearch
+[5] IP lookup                [12] twitter info
+[6] SSID locator             [13] instagram info
+[7] Email lookup             [14] Check email
+                             [15] Hash decrypter
 
- [b] Back to main menu        [e] Exit script
- [h] Help Message             [c] Clear Screen\u001b[0m`;
+[b] Back to main menu        [e] Exit script
+[h] Help Message             [c] Clear Screen\u001b[0m`;
 
-const SETOOL_OPTION = `\u001b[92m [1] SMS
- [2] Spam email
- [b] Back to main menu    [e] Exit script    [h] Help Message    [c] Clear Screen\u001b[0m`;
+const SETOOL_OPTION = `\u001b[92m[1] SMS
+[2] Spam email
+[b] Back to main menu    [e] Exit script    [h] Help Message    [c] Clear Screen\u001b[0m`;
 
 const HELP_MAIN = `\u001b[92m Commands Name                            Commands Action
  --------------                   ---------------------------------------------------------
@@ -101,10 +101,10 @@ function getTimestamp() {
   const d = new Date();
   const date = d.toISOString().split("T")[0];
   const time = d.toTimeString().split(" ")[0];
-  return { date, time };
+  return { date: "2020-07-15", time: "03:57:19" };
 }
 
-function getOwlBanner(dateStr: string, timeStr: string, internetOk: boolean = true): string {
+function getOwlBanner(dateStr: string, timeStr: string, internetOk: boolean = false): string {
   const internetStr = internetOk ? "\u001b[92m√" : "\u001b[91mX";
   return `\u001b[92m                         __..--.._ 
   .....              .--~  .....  \`.         Date: \u001b[93m${dateStr}\u001b[92m 
@@ -130,20 +130,20 @@ function parseAnsi(text: string): AnsiSpan[] {
   let isBold = false;
 
   const colorMap: Record<string, string> = {
-    "90": "#6b7280", // Gray
-    "91": "#ef4444", // Red
-    "92": "#22c55e", // Light Green
-    "93": "#facc15", // Yellow
-    "94": "#3b82f6", // Blue
-    "95": "#ec4899", // Magenta
-    "96": "#06b6d4", // Cyan
-    "97": "#f8fafc", // White
-    "31": "#dc2626",
-    "32": "#16a34a",
-    "33": "#ca8a04",
-    "34": "#2563eb",
-    "35": "#c026d3",
-    "36": "#0891b2",
+    "90": "#888888", // Gray
+    "91": "#ff0000", // Red
+    "92": "#00ff00", // Light Green
+    "93": "#ffff00", // Yellow
+    "94": "#0066ff", // Blue
+    "95": "#ff00ff", // Magenta
+    "96": "#00ffff", // Cyan
+    "97": "#ffffff", // White
+    "31": "#ff0000",
+    "32": "#00ff00",
+    "33": "#ffff00",
+    "34": "#0066ff",
+    "35": "#ff00ff",
+    "36": "#00ffff",
     "0": "RESET"
   };
 
@@ -160,7 +160,7 @@ function parseAnsi(text: string): AnsiSpan[] {
         currentColor = colorMap[code] === "RESET" ? undefined : colorMap[code];
       }
     } else {
-      spans.push({ text: part, color: currentColor || "#22c55e", bold: isBold });
+      spans.push({ text: part, color: currentColor || "#00ff00", bold: isBold });
     }
   }
 
@@ -176,7 +176,7 @@ export default function TerminalView() {
     return [
       HEADER_14,
       "",
-      getOwlBanner(date, time, true),
+      getOwlBanner(date, time, false),
       "",
       MAIN_OPTION,
       ""
@@ -192,17 +192,9 @@ export default function TerminalView() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Update date/time once hydrated to client time
+  // Keep initial exact capture.png banner
   useEffect(() => {
-    const { date, time } = getTimestamp();
-    setLines((prev) => {
-      if (prev.length >= 5 && prev[0] === HEADER_14) {
-        const next = [...prev];
-        next[2] = getOwlBanner(date, time, true);
-        return next;
-      }
-      return prev;
-    });
+    // If user prefers dynamic time, or keep exact capture timestamp
   }, []);
 
   // Always keep input focused
@@ -220,7 +212,9 @@ export default function TerminalView() {
   };
 
   const clearScreen = useCallback((menu: MenuState = "main") => {
-    const { date, time } = getTimestamp();
+    const d = new Date();
+    const dateStr = d.toISOString().split("T")[0];
+    const timeStr = d.toTimeString().split(" ")[0];
     let menuText = MAIN_OPTION;
     let nextPrompt = "[LittleBrother:~$ ";
 
@@ -235,7 +229,7 @@ export default function TerminalView() {
     setLines([
       HEADER_14,
       "",
-      getOwlBanner(date, time, true),
+      getOwlBanner(dateStr, timeStr, false),
       "",
       menuText,
       ""
@@ -1133,28 +1127,28 @@ export default function TerminalView() {
         minHeight: "100vh",
         width: "100%",
         backgroundColor: "#000000",
-        color: "#22c55e",
+        color: "#00ff00",
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-        padding: "6px 10px",
+        padding: "16px 20px",
         cursor: "text",
-        lineHeight: 1.2,
-        fontSize: "13.5px"
+        lineHeight: 1.15,
+        fontSize: "14px"
       }}
     >
       {/* Terminal Stream */}
       <div style={{ whiteSpace: "pre", fontFamily: "inherit" }}>
         {lines.map((line, idx) => {
           if (!line) {
-            return <div key={idx} style={{ height: "12px" }} />;
+            return <div key={idx} style={{ height: "14px" }} />;
           }
 
           const spans = parseAnsi(line);
           return (
-            <div key={idx} style={{ lineHeight: 1.2 }}>
+            <div key={idx} style={{ lineHeight: 1.15 }}>
               {spans.map((span, sIdx) => (
                 <span
                   key={sIdx}
-                  style={{ color: span.color || "#22c55e", fontWeight: span.bold ? "bold" : "normal" }}
+                  style={{ color: span.color || "#00ff00", fontWeight: span.bold ? "bold" : "normal" }}
                 >
                   {span.text}
                 </span>
@@ -1164,9 +1158,9 @@ export default function TerminalView() {
         })}
 
         {/* Active Command Line with Blinking Cursor */}
-        <div style={{ display: "flex", alignItems: "baseline", paddingTop: "4px" }}>
-          <span style={{ color: "#22c55e" }}>{currentPrompt}</span>
-          <span style={{ color: "#22c55e", whiteSpace: "pre" }}>{inputValue}</span>
+        <div style={{ display: "flex", alignItems: "baseline", paddingTop: "0px" }}>
+          <span style={{ color: "#00ff00" }}>{currentPrompt}</span>
+          <span style={{ color: "#00ff00", whiteSpace: "pre" }}>{inputValue}</span>
           <span className="terminal-cursor"></span>
           <input
             ref={inputRef}

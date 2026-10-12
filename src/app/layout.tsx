@@ -16,7 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full bg-black">
-      <body className="min-h-full m-0 p-0 bg-black text-[#22c55e] selection:bg-[#22c55e] selection:text-black">
+      <body className="min-h-full m-0 p-0 bg-black text-[#00ff00] selection:bg-[#00ff00] selection:text-black">
         {children}
       </body>
     </html>
